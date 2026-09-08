@@ -1,0 +1,19 @@
+{
+  "name": "Pokémon Draft League",
+  "short_name": "Poké Draft",
+  "description": "Draft a six-Pokémon roster, set weekly battle orders, earn trainer badges, and chase a league championship.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#10131a",
+  "theme_color": "#10131a",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
