@@ -183,7 +183,9 @@ h1,h2,h3,p { margin-top: 0; }
 @media (max-width: 560px) {
   .shell { padding: 12px; }
   .topbar { align-items: flex-start; }
-  .brand span:last-child { display: none; }
+  .brand { gap: 8px; min-width: 0; }
+  .brand-ball { width: 28px; height: 28px; flex: 0 0 28px; }
+  .brand span:last-child { display: inline; font-size: .88rem; line-height: 1.05; white-space: normal; }
   .hero { padding-top: 10px; }
   .hero-card { border-radius: 21px; padding: 24px 18px; }
   .hero h1 { font-size: 3.2rem; }
