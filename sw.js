@@ -1,5 +1,5 @@
-const CACHE = 'pokemon-draft-v1.8.0';
-const CORE = ['./', './index.html', './style.css?v=1.8.0', './game.js?v=1.8.0', './manifest.json?v=1.8.0', './icon.svg'];
+const CACHE = 'pokemon-draft-v1.9.0';
+const CORE = ['./', './index.html', './style.css?v=1.9.0', './game.js?v=1.9.0', './manifest.json?v=1.9.0', './icon.svg'];
 
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(CORE)));

@@ -400,6 +400,7 @@ function renderDraft(){
     render();
     await advanceToUserPick();
   });
+  bindPokemonDetailTriggers();
 }
 
 function pokemonCardHTML(p,canDraft){
@@ -419,7 +420,7 @@ function pokemonCardHTML(p,canDraft){
 function rosterHTML(ids){
   return Array.from({length:ROSTER_SIZE},(_,i)=>{
     const p=ids[i]&&pokemonById(ids[i]);
-    return p?`<div class="roster-slot"><img src="${p.sprite}" alt=""><div><strong>${p.name}</strong><small>${p.types.join(' / ')}</small></div></div>`:`<div class="roster-slot"><span class="empty">Round ${i+1} pick</span></div>`;
+    return p?`<button type="button" class="roster-slot roster-slot-trigger" data-pokemon-detail="${p.id}" aria-label="View ${p.name} stats"><img src="${p.sprite}" alt=""><span><strong>${p.name}</strong><small>${p.types.join(' / ')}</small></span></button>`:`<div class="roster-slot"><span class="empty">Round ${i+1} pick</span></div>`;
   }).join('');
 }
 function logHTML(x){
@@ -926,8 +927,10 @@ function lineupRowHTML(id,index){
   const p=pokemonById(id);
   return `<div class="lineup-row">
     <span class="lineup-number">${index+1}</span>
-    <img src="${p.sprite}" onerror="this.src='${spriteFallback(p.id)}'" alt="${p.name}">
-    <div class="lineup-name"><strong>${p.name}</strong><small>${p.types.join(' / ')}</small></div>
+    <button type="button" class="lineup-mon-trigger" data-pokemon-detail="${p.id}" aria-label="View ${p.name} stats">
+      <img src="${p.sprite}" onerror="this.src='${spriteFallback(p.id)}'" alt="">
+      <span class="lineup-name"><strong>${p.name}</strong><small>${p.types.join(' / ')}</small></span>
+    </button>
     <div class="lineup-controls"><button class="lineup-arrow" data-lineup-up="${p.id}" ${index===0?'disabled':''} aria-label="Move ${p.name} up">↑</button><button class="lineup-arrow" data-lineup-down="${p.id}" ${index===ROSTER_SIZE-1?'disabled':''} aria-label="Move ${p.name} down">↓</button></div>
   </div>`;
 }
@@ -953,7 +956,7 @@ function matchupPanelHTML(opponent,label){
 function playerStatsTableHTML(teamId='user'){
   const team=teamById(teamId);
   const stats=team.roster.map(id=>state.season.playerStats[id]).filter(Boolean).sort((a,b)=>b.w-a.w || b.kos-a.kos);
-  return `<div class="player-stats-wrap"><table class="player-stats"><thead><tr><th>Pokémon</th><th>W</th><th>L</th><th>KO</th><th>Win%</th></tr></thead><tbody>${stats.map(st=>{const p=pokemonById(st.pokemonId);const pct=st.gp?Math.round(st.w/st.gp*100):0;return `<tr><td><span class="stat-mon"><img src="${p.sprite}" onerror="this.src='${spriteFallback(p.id)}'" alt=""><strong>${p.name}</strong></span></td><td>${st.w}</td><td>${st.l}</td><td>${st.kos}</td><td>${pct}%</td></tr>`;}).join('')}</tbody></table></div>`;
+  return `<div class="player-stats-wrap"><table class="player-stats"><thead><tr><th>Pokémon</th><th>W</th><th>L</th><th>KO</th><th>Win%</th></tr></thead><tbody>${stats.map(st=>{const p=pokemonById(st.pokemonId);const pct=st.gp?Math.round(st.w/st.gp*100):0;const trigger=teamId==='user';return `<tr><td>${trigger?`<button type="button" class="stat-mon stat-mon-trigger" data-pokemon-detail="${p.id}" aria-label="View ${p.name} stats"><img src="${p.sprite}" onerror="this.src='${spriteFallback(p.id)}'" alt=""><strong>${p.name}</strong></button>`:`<span class="stat-mon"><img src="${p.sprite}" onerror="this.src='${spriteFallback(p.id)}'" alt=""><strong>${p.name}</strong></span>`}</td><td>${st.w}</td><td>${st.l}</td><td>${st.kos}</td><td>${pct}%</td></tr>`;}).join('')}</tbody></table></div>`;
 }
 
 function leagueLeadersHTML(){
@@ -1102,6 +1105,7 @@ function renderSeason(){
   document.querySelectorAll('[data-lineup-down]').forEach(btn=>btn.onclick=()=>moveUserLineup(Number(btn.dataset.lineupDown),1));
   document.querySelectorAll('[data-game-index]').forEach(btn=>btn.onclick=()=>showGameModal(Number(btn.dataset.gameIndex)));
   document.querySelectorAll('[data-playoff-game]').forEach(btn=>btn.onclick=()=>showPlayoffGameModal(btn.dataset.playoffGame));
+  bindPokemonDetailTriggers();
 }
 
 function gameRowHTML(g){
@@ -1235,10 +1239,68 @@ function renderRecap(){
   document.getElementById('badgesBtn').onclick=()=>{state.screen='challenges';render();};
   document.getElementById('homeBtn').onclick=()=>{state.screen='home';render();};
   document.querySelectorAll('[data-playoff-game]').forEach(btn=>btn.onclick=()=>showPlayoffGameModal(btn.dataset.playoffGame));
+  bindPokemonDetailTriggers();
 }
 
 function playoffHTML(p){
   return playoffBracketHTML(true);
+}
+
+function pokemonSeasonStats(id){
+  return state.season?.playerStats?.[id] || null;
+}
+
+function pokemonDetailModalHTML(p,stats=null){
+  const totalGp=stats?.gp || 0;
+  const totalW=stats?.w || 0;
+  const totalL=stats?.l || 0;
+  const playoffW=stats?.playoffW || 0;
+  const playoffL=stats?.playoffL || 0;
+  const regularW=Math.max(0,totalW-playoffW);
+  const regularL=Math.max(0,totalL-playoffL);
+  const regularGp=Math.max(0,totalGp-playoffW-playoffL);
+  const winPct=totalGp?Math.round(totalW/totalGp*100):0;
+  return `<div class="pokemon-detail">
+    <div class="pokemon-detail-hero">
+      <img src="${p.sprite}" onerror="this.src='${spriteFallback(p.id)}'" alt="${p.name}">
+      <div><div class="types pokemon-detail-types">${p.types.map(t=>`<span class="type">${t}</span>`).join('')}</div><p>#${String(p.id).padStart(3,'0')} • Projected #${p.projRank}</p></div>
+    </div>
+    <div class="pokemon-detail-section">
+      <h3>Base Stats</h3>
+      <div class="pokemon-detail-base-stats">
+        <div><span>HP</span><strong>${p.hp}</strong></div>
+        <div><span>Attack</span><strong>${p.atk}</strong></div>
+        <div><span>Defense</span><strong>${p.def}</strong></div>
+        <div><span>Sp. Atk</span><strong>${p.spa}</strong></div>
+        <div><span>Sp. Def</span><strong>${p.spd}</strong></div>
+        <div><span>Speed</span><strong>${p.spe}</strong></div>
+      </div>
+    </div>
+    <div class="pokemon-detail-section">
+      <h3>Season Stats</h3>
+      ${stats?`<div class="pokemon-detail-season-stats">
+        <div><span>Games</span><strong>${totalGp}</strong></div>
+        <div><span>Overall</span><strong>${totalW}-${totalL}</strong></div>
+        <div><span>Win %</span><strong>${winPct}%</strong></div>
+        <div><span>KOs</span><strong>${stats.kos || 0}</strong></div>
+        <div><span>Regular Season</span><strong>${regularW}-${regularL}</strong><small>${regularGp} battles</small></div>
+        <div><span>Playoffs</span><strong>${playoffW}-${playoffL}</strong></div>
+      </div>`:`<p class="muted pokemon-detail-empty">Season stats will appear once the draft is complete and the season begins.</p>`}
+    </div>
+  </div>`;
+}
+
+function showPokemonDetailModal(id){
+  const p=pokemonById(Number(id));
+  if(!p) return;
+  state.modal={title:p.name,html:pokemonDetailModalHTML(p,pokemonSeasonStats(p.id))};
+  renderModal();
+}
+
+function bindPokemonDetailTriggers(){
+  document.querySelectorAll('[data-pokemon-detail]').forEach(el=>{
+    el.onclick=()=>showPokemonDetailModal(Number(el.dataset.pokemonDetail));
+  });
 }
 
 function showCareerModal(){
@@ -1280,7 +1342,7 @@ async function init(){
         window.location.reload();
       });
 
-      navigator.serviceWorker.register('./sw.js?v=1.8.0',{updateViaCache:'none'})
+      navigator.serviceWorker.register('./sw.js?v=1.9.0',{updateViaCache:'none'})
         .then(reg=>{
           const activateNow=worker=>{
             if(worker) worker.postMessage({type:'SKIP_WAITING'});
