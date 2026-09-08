@@ -1283,3 +1283,261 @@ button.bracket-match:hover { border-color: #65738a; transform: translateY(-1px);
   .how-step { padding: 11px; }
   .settings-install { padding: 13px 15px 15px; }
 }
+
+/* v1.13: season hub, scouted battle order, and battle feedback */
+.season-hub {
+  margin-bottom: 12px;
+  padding: 15px;
+  background: linear-gradient(135deg,rgba(255,213,74,.055),#171c25 34%,#151a23);
+}
+.season-hub-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.season-hub-head h2 { margin: 3px 0 0; font-size: 1.05rem; letter-spacing: -.025em; }
+.hub-week {
+  flex: 0 0 auto;
+  padding: 6px 9px;
+  border: 1px solid #394457;
+  border-radius: 999px;
+  color: var(--muted);
+  background: #11161f;
+  font-size: .62rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+.season-hub-grid {
+  display: grid;
+  grid-template-columns: .75fr .75fr .75fr 1.05fr 1.35fr 1.35fr;
+  gap: 7px;
+}
+.hub-stat,
+.hub-feature {
+  min-width: 0;
+  min-height: 72px;
+  padding: 9px 10px;
+  border: 1px solid #2d3746;
+  border-radius: 12px;
+  background: #11161f;
+}
+.hub-stat > span,
+.hub-feature > span {
+  display: block;
+  color: var(--muted);
+  font-size: .56rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+.hub-stat strong { display: block; margin-top: 7px; font-size: 1.15rem; line-height: 1; }
+.hub-stat.primary { border-color: rgba(255,213,74,.28); background: rgba(255,213,74,.055); }
+.hub-stat.primary strong { color: var(--accent); font-size: 1.35rem; }
+.hub-stat strong.win { color: var(--success); }
+.hub-stat strong.loss { color: #ff9e9e; }
+.hub-feature strong { display: block; margin-top: 6px; font-size: .78rem; line-height: 1.2; overflow-wrap: anywhere; }
+.hub-feature small { display: block; margin-top: 4px; color: var(--muted); font-size: .58rem; }
+.hub-feature.mvp > div { min-width: 0; display: flex; align-items: center; gap: 5px; margin-top: 3px; }
+.hub-feature.mvp img { width: 30px; height: 30px; object-fit: contain; flex: 0 0 auto; }
+.hub-feature.mvp > div strong { min-width: 0; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.last-game-strip {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto auto minmax(0,1fr);
+  gap: 8px 12px;
+  align-items: center;
+  margin-top: 8px;
+  padding: 8px 10px;
+  border: 1px solid #303a49;
+  border-radius: 11px;
+  background: #10151d;
+}
+.last-game-strip.win { border-left: 3px solid var(--success); }
+.last-game-strip.loss { border-left: 3px solid #ef6a6a; }
+.last-game-strip > span { color: var(--muted); font-size: .56rem; font-weight: 900; text-transform: uppercase; letter-spacing: .07em; }
+.last-game-strip > strong { font-size: .7rem; white-space: nowrap; }
+.last-game-strip > small { min-width: 0; color: var(--muted); font-size: .62rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Opponent order is now revealed and locked. Each row is the actual 1v1 pairing. */
+.matchup-panel { padding: 15px; }
+.matchup-order-head {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) 58px minmax(0,1fr);
+  gap: 8px;
+  margin: 0 0 6px;
+  padding: 0 6px;
+  color: var(--muted);
+  font-size: .62rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+}
+.matchup-order-head span:last-child { text-align: right; }
+.matchup-order-board { display: grid; gap: 6px; }
+.matchup-order-row {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0,1fr) 58px minmax(0,1fr);
+  gap: 8px;
+  align-items: stretch;
+}
+.matchup-side {
+  min-width: 0;
+  min-height: 54px;
+  display: grid;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 7px;
+  border: 1px solid #2b3443;
+  border-radius: 11px;
+  background: #11161f;
+}
+.matchup-side.user-side { grid-template-columns: 27px minmax(0,1fr) auto; }
+.matchup-side.cpu-side { grid-template-columns: 24px 42px minmax(0,1fr) auto; }
+.matchup-side.cpu-side > img { width: 42px; height: 42px; object-fit: contain; }
+.cpu-slot-number {
+  width: 23px;
+  height: 23px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: #202735;
+  color: #aab4c4;
+  font-size: .66rem;
+  font-weight: 900;
+}
+.matchup-vs {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 3px;
+  color: #69768a;
+}
+.matchup-vs > span { font-size: .58rem; font-weight: 1000; letter-spacing: .08em; }
+.slot-edge {
+  min-width: 40px;
+  padding: 3px 5px;
+  border-radius: 999px;
+  text-align: center;
+  font-size: .48rem;
+  font-weight: 950;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  background: #202735;
+  color: var(--muted);
+}
+.slot-edge.you { color: #aaf0c8; background: rgba(85,209,139,.12); }
+.slot-edge.them { color: #ffc1c1; background: rgba(239,106,106,.12); }
+.type-preview {
+  justify-self: end;
+  color: #8390a3;
+  font-size: .5rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.matchup-scout-note {
+  margin: 9px 2px 0;
+  color: var(--muted);
+  font-size: .63rem;
+  line-height: 1.4;
+  text-align: center;
+}
+
+/* Detailed postgame feedback */
+.battle-modal-score {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) auto minmax(0,1fr);
+  gap: 10px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid #303a49;
+  border-radius: 13px;
+  background: #11161f;
+  text-align: center;
+}
+.battle-modal-score > span { min-width: 0; font-size: .74rem; font-weight: 800; overflow-wrap: anywhere; }
+.battle-modal-score > strong { color: var(--accent); font-size: 1.45rem; }
+.battle-feedback-intro { margin: 10px 2px; color: var(--muted); font-size: .7rem; line-height: 1.45; }
+.battle-story-summary { display: grid; grid-template-columns: repeat(3,1fr); gap: 7px; margin: 10px 0; }
+.battle-story-summary > div { padding: 9px 6px; border: 1px solid #303949; border-radius: 10px; background: #11161f; text-align: center; }
+.battle-story-summary strong { display: block; color: var(--accent); font-size: 1rem; }
+.battle-story-summary span { display: block; margin-top: 2px; color: var(--muted); font-size: .54rem; text-transform: uppercase; letter-spacing: .04em; }
+.battle-feedback-list { display: grid; gap: 7px; }
+.battle-feedback-row { padding: 9px 10px; border: 1px solid #2d3746; border-radius: 11px; background: #10151d; }
+.battle-feedback-main { display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); gap: 7px; align-items: center; font-size: .76rem; }
+.battle-feedback-main span:last-child { text-align: right; }
+.battle-feedback-main b { color: #667287; font-size: .55rem; }
+.battle-feedback-main .winner { color: var(--success); font-weight: 900; }
+.battle-feedback-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+.battle-feedback-tags span { padding: 3px 6px; border-radius: 999px; background: #202735; color: #aeb8c8; font-size: .48rem; font-weight: 950; letter-spacing: .04em; }
+.battle-feedback-tags .type { color: #ffd985; background: rgba(255,213,74,.1); }
+.battle-feedback-tags .speed { color: #abd9ff; background: rgba(108,178,239,.1); }
+.battle-feedback-tags .stats { color: #c8bcff; background: rgba(157,132,255,.1); }
+.battle-feedback-tags .upset { color: #ffadad; background: rgba(239,106,106,.12); }
+.battle-feedback-row p { margin: 6px 0 0; color: var(--muted); font-size: .62rem; line-height: 1.4; }
+.battle-feedback-row p strong { color: var(--text); }
+
+@media (max-width: 900px) {
+  .season-hub-grid { grid-template-columns: repeat(4,minmax(0,1fr)); }
+  .hub-feature { grid-column: span 2; }
+}
+
+@media (max-width: 640px) {
+  .season-hub { padding: 11px; }
+  .season-hub-grid { grid-template-columns: 1fr 1fr; gap: 6px; }
+  .hub-stat, .hub-feature { min-height: 64px; padding: 8px; }
+  .hub-stat strong { font-size: 1rem; }
+  .hub-stat.primary strong { font-size: 1.18rem; }
+  .hub-feature { grid-column: auto; }
+  .hub-feature strong { font-size: .7rem; }
+  .last-game-strip { grid-template-columns: auto 1fr; gap: 4px 8px; }
+  .last-game-strip > strong { text-align: right; font-size: .64rem; }
+  .last-game-strip > small { grid-column: 1 / -1; white-space: normal; line-height: 1.35; }
+
+  .matchup-panel { padding: 11px; }
+  .matchup-order-head,
+  .matchup-order-row { grid-template-columns: minmax(0,1fr) 32px minmax(0,1fr); gap: 4px; }
+  .matchup-order-head { padding: 0 2px; font-size: .51rem; }
+  .matchup-side { min-height: 51px; gap: 4px; padding: 4px; }
+  .matchup-side.user-side { grid-template-columns: 20px minmax(0,1fr) 25px; }
+  .matchup-side.cpu-side { grid-template-columns: 19px 34px minmax(0,1fr); }
+  .matchup-side.cpu-side > img { width: 34px; height: 34px; }
+  .matchup-side .lineup-number,
+  .cpu-slot-number { width: 19px; height: 19px; font-size: .54rem; border-radius: 6px; }
+  .matchup-side .lineup-mon-trigger { grid-template-columns: 34px minmax(0,1fr); gap: 4px; }
+  .matchup-side .lineup-mon-trigger img { width: 34px; height: 34px; }
+  .matchup-side .lineup-name strong { font-size: .59rem; }
+  .matchup-side .lineup-name small { font-size: .43rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .matchup-side .lineup-controls { flex-direction: column; gap: 2px; }
+  .matchup-side .lineup-arrow { width: 24px; height: 21px; font-size: .65rem; border-radius: 6px; }
+  .type-preview { display: none; }
+  .matchup-vs > span { font-size: .47rem; }
+  .slot-edge { min-width: 29px; padding: 3px 2px; font-size: .39rem; }
+  .matchup-edges { margin-top: 7px; }
+  .matchup-scout-note { font-size: .56rem; }
+
+  .battle-feedback-row { padding: 8px; }
+  .battle-feedback-main { font-size: .67rem; }
+  .battle-feedback-row p { font-size: .58rem; }
+  .battle-story-summary span { font-size: .47rem; }
+}
+
+@media (max-width: 380px) {
+  .season-hub-grid { gap: 5px; }
+  .hub-stat, .hub-feature { min-height: 59px; padding: 7px; }
+  .hub-stat > span, .hub-feature > span { font-size: .49rem; }
+  .hub-feature.mvp img { width: 25px; height: 25px; }
+  .hub-feature small { font-size: .5rem; }
+  .matchup-side.user-side { grid-template-columns: 18px minmax(0,1fr) 23px; }
+  .matchup-side.cpu-side { grid-template-columns: 18px 30px minmax(0,1fr); }
+  .matchup-side.cpu-side > img { width: 30px; height: 30px; }
+  .matchup-side .lineup-mon-trigger { grid-template-columns: 30px minmax(0,1fr); }
+  .matchup-side .lineup-mon-trigger img { width: 30px; height: 30px; }
+  .matchup-side .lineup-name strong { font-size: .54rem; }
+  .matchup-side .lineup-name small { display: none; }
+  .matchup-side .lineup-arrow { width: 22px; }
+  .battle-story-summary { gap: 5px; }
+}

@@ -696,7 +696,7 @@ function createSeason(){
   };
 }
 
-function duelExpectedEdge(a,b){
+function duelComponents(a,b){
   const speedEdge=(a.spe-b.spe)*.12;
   const type=typeMatchupData(a,b);
   // One effectiveness step (1× -> 2×, or 1× -> 0.5×) is meaningful without
@@ -704,13 +704,45 @@ function duelExpectedEdge(a,b){
   // naturally create much larger swings because the stages stack.
   const matchupEdge=(type.aStage-type.bStage)*14;
   const powerEdge=(a.projectionScore-b.projectionScore)*.28;
-  return powerEdge+speedEdge+matchupEdge;
+  return {speedEdge,matchupEdge,powerEdge,type,total:powerEdge+speedEdge+matchupEdge};
+}
+
+function duelExpectedEdge(a,b){
+  return duelComponents(a,b).total;
+}
+
+function duelWinProbability(a,b){
+  // Duel variance is uniform from -23 to +23. This gives an exact pregame
+  // probability for the stat/type/speed edge before the random roll happens.
+  const edge=duelExpectedEdge(a,b);
+  if(edge>=23) return 1;
+  if(edge<=-23) return 0;
+  return (edge+23)/46;
+}
+
+function lineupWinProbability(teamA,teamB,aOrder,bOrder){
+  const aRoster=normalizeLineup(teamA,aOrder);
+  const bRoster=normalizeLineup(teamB,bOrder);
+  let dist=[1,0,0,0,0,0,0];
+  for(let i=0;i<ROSTER_SIZE;i++){
+    const p=duelWinProbability(aRoster[i],bRoster[i]);
+    const next=Array(7).fill(0);
+    for(let wins=0;wins<=i;wins++){
+      next[wins]+=dist[wins]*(1-p);
+      next[wins+1]+=dist[wins]*p;
+    }
+    dist=next;
+  }
+  const aPower=sum(aRoster.map(p=>p.projectionScore));
+  const bPower=sum(bRoster.map(p=>p.projectionScore));
+  const tiebreak=clamp(.5+(aPower-bPower)/Math.max(1,aPower+bPower)*3,.32,.68);
+  return clamp(dist[4]+dist[5]+dist[6]+dist[3]*tiebreak,0,1);
 }
 
 function simulateDuel(a,b){
   const expectedEdge=duelExpectedEdge(a,b);
   const noise=(Math.random()-.5)*46;
-  return { winner:expectedEdge+noise>=0?a:b, expectedEdge };
+  return { winner:expectedEdge+noise>=0?a:b, expectedEdge, noise };
 }
 
 function cpuStrategicOrder(team,opponentTeam){
@@ -741,7 +773,7 @@ function simulateMatch(teamA,teamB,options={}){
     const a=aRoster[i], b=bRoster[i];
     const duel=simulateDuel(a,b), winner=duel.winner;
     winner.id===a.id?aWins++:bWins++;
-    battles.push({aId:a.id,bId:b.id,winnerId:winner.id,expectedEdge:duel.expectedEdge});
+    battles.push({aId:a.id,bId:b.id,winnerId:winner.id,expectedEdge:duel.expectedEdge,noise:duel.noise});
   }
   if(aWins===bWins){
     const aPower=sum(aRoster.map(p=>p.projectionScore))*(.96+Math.random()*.08);
@@ -801,12 +833,15 @@ function typePressure(teamA,teamB){
   return avg(a.map(p=>avg(b.map(o=>typeMultiplierStage(bestTypeMultiplier(p,o))))));
 }
 
-function matchupPreview(teamA,teamB){
+function matchupPreview(teamA,teamB,aOrder=null,bOrder=null){
   const ma=teamMetrics(teamA), mb=teamMetrics(teamB);
   const pa=typePressure(teamA,teamB), pb=typePressure(teamB,teamA);
-  const scoreA=ma.power*.34+ma.speed*.18+ma.bulk*.18+ma.coverage*.12+(pa-pb)*18;
-  const scoreB=mb.power*.34+mb.speed*.18+mb.bulk*.18+mb.coverage*.12+(pb-pa)*18;
-  const pct=clamp(Math.round(50+(scoreA-scoreB)*.72),22,78);
+  const genericScoreA=ma.power*.34+ma.speed*.18+ma.bulk*.18+ma.coverage*.12+(pa-pb)*18;
+  const genericScoreB=mb.power*.34+mb.speed*.18+mb.bulk*.18+mb.coverage*.12+(pb-pa)*18;
+  const genericPct=clamp(Math.round(50+(genericScoreA-genericScoreB)*.72),22,78);
+  const pct=aOrder&&bOrder
+    ? clamp(Math.round(lineupWinProbability(teamA,teamB,aOrder,bOrder)*100),5,95)
+    : genericPct;
   return {
     pct,
     categories:[
@@ -873,18 +908,20 @@ function simulatePlayoffGame(game,stageLabel){
   return result;
 }
 
-function currentPlayoffUserOpponent(){
+function currentPlayoffUserGame(){
   const p=state.season?.playoffs;
   if(!p) return null;
   if(state.season.playoffPhase==='semis'){
-    const g=p.semis.find(x=>!x.result&&(x.aId==='user'||x.bId==='user'));
-    if(!g) return null;
-    return teamById(g.aId==='user'?g.bId:g.aId);
+    return p.semis.find(x=>!x.result&&(x.aId==='user'||x.bId==='user')) || null;
   }
-  if(state.season.playoffPhase==='final' && p.final && !p.final.result && (p.final.aId==='user'||p.final.bId==='user')){
-    return teamById(p.final.aId==='user'?p.final.bId:p.final.aId);
-  }
+  if(state.season.playoffPhase==='final' && p.final && !p.final.result && (p.final.aId==='user'||p.final.bId==='user')) return p.final;
   return null;
+}
+
+function currentPlayoffUserOpponent(){
+  const g=currentPlayoffUserGame();
+  if(!g) return null;
+  return teamById(g.aId==='user'?g.bId:g.aId);
 }
 
 function simulatePlayoffs(){
@@ -1014,21 +1051,41 @@ function lineupRowHTML(id,index){
   </div>`;
 }
 
-function opponentRosterHTML(team){
-  return `<div class="opponent-roster">${team.roster.map(id=>{const p=pokemonById(id);return `<div class="opponent-mon"><img src="${p.sprite}" onerror="this.src='${spriteFallback(p.id)}'" alt="${p.name}"><strong>${p.name}</strong><small>${p.types.join(' / ')}</small></div>`;}).join('')}</div>`;
+function matchupOrderRowHTML(userId,opponentId,index){
+  const userP=pokemonById(userId), oppP=pokemonById(opponentId);
+  const type=typeMatchupData(userP,oppP);
+  const edge=duelExpectedEdge(userP,oppP);
+  const edgeClass=Math.abs(edge)<4?'even':edge>0?'you':'them';
+  const edgeLabel=Math.abs(edge)<4?'Even':edge>0?'You':'CPU';
+  return `<div class="matchup-order-row">
+    <div class="matchup-side user-side">
+      <span class="lineup-number">${index+1}</span>
+      <button type="button" class="lineup-mon-trigger" data-pokemon-detail="${userP.id}" aria-label="View ${userP.name} stats">
+        <img src="${userP.sprite}" onerror="this.src='${spriteFallback(userP.id)}'" alt="">
+        <span class="lineup-name"><strong>${userP.name}</strong><small>${userP.types.join(' / ')}</small></span>
+      </button>
+      <div class="lineup-controls"><button class="lineup-arrow" data-lineup-up="${userP.id}" ${index===0?'disabled':''} aria-label="Move ${userP.name} up">↑</button><button class="lineup-arrow" data-lineup-down="${userP.id}" ${index===ROSTER_SIZE-1?'disabled':''} aria-label="Move ${userP.name} down">↓</button></div>
+    </div>
+    <div class="matchup-vs"><span>VS</span><small class="slot-edge ${edgeClass}">${edgeLabel}</small></div>
+    <div class="matchup-side cpu-side">
+      <span class="cpu-slot-number">${index+1}</span>
+      <img src="${oppP.sprite}" onerror="this.src='${spriteFallback(oppP.id)}'" alt="${oppP.name}">
+      <span class="lineup-name"><strong>${oppP.name}</strong><small>${oppP.types.join(' / ')}</small></span>
+      <span class="type-preview">${formatMultiplier(type.bMultiplier)} / ${formatMultiplier(type.aMultiplier)}</span>
+    </div>
+  </div>`;
 }
 
-function matchupPanelHTML(opponent,label){
+function matchupPanelHTML(opponent,label,opponentOrder){
   if(!opponent) return '';
-  const preview=matchupPreview(userTeam(),opponent);
+  const lockedOrder=(opponentOrder?.length?opponentOrder:cpuStrategicOrder(opponent,userTeam()));
+  const preview=matchupPreview(userTeam(),opponent,state.season.userLineup,lockedOrder);
   return `<section class="panel matchup-panel">
-    <div class="matchup-head"><div><div class="eyebrow">${label}</div><h2>${escapeHTML(userTeam().name)} vs ${escapeHTML(opponent.name)}</h2><p>Set your battle order. You can see their six Pokémon, but their order stays hidden.</p></div><div class="projection"><b>${preview.pct}%</b><span>Projected Win</span></div></div>
-    <div class="matchup-grid">
-      <div><h3>Your Battle Order</h3><div class="lineup-list">${state.season.userLineup.map(lineupRowHTML).join('')}</div></div>
-      <div><h3>${escapeHTML(opponent.name)} <span class="muted small">Order Hidden</span></h3>${opponentRosterHTML(opponent)}
-        <div class="matchup-edges">${preview.categories.map(([name,a,b])=>{const diff=a-b;const who=Math.abs(diff)<4?'Even':diff>0?'You':opponent.name;return `<div><span>${name}</span><strong class="${who==='You'?'edge-you':who==='Even'?'':'edge-them'}">${escapeHTML(who)}</strong></div>`;}).join('')}</div>
-      </div>
-    </div>
+    <div class="matchup-head"><div><div class="eyebrow">${label}</div><h2>${escapeHTML(userTeam().name)} vs ${escapeHTML(opponent.name)}</h2><p>Opponent order is scouted and locked. Reorder your six Pokémon to choose the 1v1 matchups you want.</p></div><div class="projection"><b>${preview.pct}%</b><span>Projected Win</span></div></div>
+    <div class="matchup-order-head"><span>Your lineup</span><span></span><span>${escapeHTML(opponent.name)}</span></div>
+    <div class="matchup-order-board">${state.season.userLineup.map((id,i)=>matchupOrderRowHTML(id,lockedOrder[i],i)).join('')}</div>
+    <div class="matchup-edges">${preview.categories.map(([name,a,b])=>{const diff=a-b;const who=Math.abs(diff)<4?'Even':diff>0?'You':opponent.name;return `<div><span>${name}</span><strong class="${who==='You'?'edge-you':who==='Even'?'':'edge-them'}">${escapeHTML(who)}</strong></div>`;}).join('')}</div>
+    <p class="matchup-scout-note">The CPU lineup will not change after you see it. Moving your Pokémon changes the projected win chance immediately.</p>
   </section>`;
 }
 
@@ -1146,13 +1203,172 @@ function simToPlayoffs(){
   render();
 }
 
+function userSeasonStanding(){
+  return state.season?.standings?.find(x=>x.teamId==='user') || {w:0,l:0,pf:0,pa:0};
+}
+
+function userSeasonRank(){
+  const i=rankedStandings().findIndex(x=>x.teamId==='user');
+  return i>=0?i+1:null;
+}
+
+function userSeasonStreak(){
+  const games=state.season.schedule.filter(g=>g.played&&(g.homeId==='user'||g.awayId==='user')).sort((a,b)=>a.week-b.week);
+  if(!games.length) return {text:'—',type:'even'};
+  const last=games[games.length-1];
+  const lastWon=last.result.winnerId==='user';
+  let count=0;
+  for(let i=games.length-1;i>=0;i--){
+    const won=games[i].result.winnerId==='user';
+    if(won!==lastWon) break;
+    count++;
+  }
+  return {text:`${lastWon?'W':'L'}${count}`,type:lastWon?'win':'loss'};
+}
+
+function currentUserMvp(){
+  return rankedPlayerStats(x=>x.teamId==='user' && x.gp>0)[0] || null;
+}
+
+function teamRecordText(teamId){
+  const st=state.season.standings.find(x=>x.teamId===teamId);
+  return st?`${st.w}-${st.l}`:'0-0';
+}
+
+function playoffPictureText(){
+  const s=state.season, rank=userSeasonRank();
+  if(s.complete) return s.champion==='user'?'CHAMPION':'Season complete';
+  if(s.week>=14){
+    const seed=s.playoffs?.seeds?.find(x=>x.teamId==='user')?.seed;
+    return seed?`#${seed} seed`:'Missed playoffs';
+  }
+  if(!rank) return '—';
+  return rank<=4?`In • #${rank}`:`Outside • #${rank}`;
+}
+
+function lastUserPlayedGame(){
+  const games=state.season.schedule.filter(g=>g.played&&(g.homeId==='user'||g.awayId==='user'));
+  return games.sort((a,b)=>b.week-a.week)[0] || null;
+}
+
+function formatMultiplier(mult){
+  if(mult===0) return '0×';
+  if(mult===.25) return '¼×';
+  if(mult===.5) return '½×';
+  if(Number.isInteger(mult)) return `${mult}×`;
+  return `${mult}×`;
+}
+
+function battleFeedbackData(battle){
+  const a=pokemonById(battle.aId), b=pokemonById(battle.bId);
+  const winner=battle.winnerId===a.id?a:b;
+  const loser=winner.id===a.id?b:a;
+  const comp=duelComponents(a,b);
+  const winnerIsA=winner.id===a.id;
+  const winnerMult=winnerIsA?comp.type.aMultiplier:comp.type.bMultiplier;
+  const loserMult=winnerIsA?comp.type.bMultiplier:comp.type.aMultiplier;
+  const favoredId=battle.expectedEdge>=0?a.id:b.id;
+  const upset=winner.id!==favoredId && Math.abs(battle.expectedEdge)>=6;
+  const speedDiff=winner.spe-loser.spe;
+  const statDiff=winner.projectionScore-loser.projectionScore;
+  const tags=[];
+  if(upset) tags.push({text:'UPSET',kind:'upset'});
+  if(winnerMult>=4) tags.push({text:`${formatMultiplier(winnerMult)} TYPE`,kind:'type'});
+  else if(winnerMult>=2 && winnerMult>loserMult) tags.push({text:'TYPE EDGE',kind:'type'});
+  if(speedDiff>=18) tags.push({text:'SPEED EDGE',kind:'speed'});
+  if(statDiff>=22) tags.push({text:'STAT EDGE',kind:'stats'});
+  if(!tags.length) tags.push({text:'CLOSE MATCHUP',kind:'even'});
+
+  let reason='Won a close matchup where no single edge dominated.';
+  if(upset){
+    reason=`Pulled the upset despite the pre-battle matchup favoring ${loser.name}.`;
+  } else if(winnerMult>=4){
+    reason=`Exploited a huge ${formatMultiplier(winnerMult)} type matchup against ${loser.name}.`;
+  } else if(winnerMult>=2 && winnerMult>loserMult){
+    reason=`Had the stronger type matchup (${formatMultiplier(winnerMult)} offense vs ${formatMultiplier(loserMult)}).`;
+  } else if(speedDiff>=18){
+    reason=`Used a ${speedDiff}-point Speed advantage to swing the matchup.`;
+  } else if(statDiff>=22){
+    reason='Had the stronger overall base-stat profile.';
+  }
+  return {a,b,winner,loser,winnerMult,loserMult,upset,speedDiff,statDiff,tags,reason};
+}
+
+function battleFeedbackRowHTML(battle){
+  const d=battleFeedbackData(battle);
+  return `<div class="battle-feedback-row">
+    <div class="battle-feedback-main"><span class="${battle.winnerId===d.a.id?'winner':''}">${d.a.name}</span><b>VS</b><span class="${battle.winnerId===d.b.id?'winner':''}">${d.b.name}</span></div>
+    <div class="battle-feedback-tags">${d.tags.slice(0,3).map(t=>`<span class="${t.kind}">${t.text}</span>`).join('')}</div>
+    <p><strong>${d.winner.name}</strong>: ${d.reason}</p>
+  </div>`;
+}
+
+function battleRecapHTML(result){
+  const feedback=result.battles.map(battleFeedbackData);
+  const upsets=feedback.filter(x=>x.upset).length;
+  const typeWins=feedback.filter(x=>x.winnerMult>=2 && x.winnerMult>x.loserMult).length;
+  const speedWins=feedback.filter(x=>x.speedDiff>=18).length;
+  return `<div class="battle-story-summary">
+    <div><strong>${typeWins}</strong><span>Type-edge wins</span></div>
+    <div><strong>${speedWins}</strong><span>Speed-edge wins</span></div>
+    <div><strong>${upsets}</strong><span>Upsets</span></div>
+  </div>
+  <div class="battle-feedback-list">${result.battles.map(battleFeedbackRowHTML).join('')}</div>`;
+}
+
+function lastGameHighlight(game){
+  if(!game?.result) return '';
+  const userHome=game.homeId==='user';
+  const opponent=teamById(userHome?game.awayId:game.homeId);
+  const uw=userHome?game.result.aWins:game.result.bWins;
+  const ow=userHome?game.result.bWins:game.result.aWins;
+  const won=game.result.winnerId==='user';
+  const all=game.result.battles.map(battleFeedbackData);
+  const best=all.find(x=>x.upset) || [...all].sort((x,y)=>Math.max(y.winnerMult,1/y.loserMult)-Math.max(x.winnerMult,1/x.loserMult))[0];
+  const story=best?`${best.winner.name}: ${best.reason}`:'';
+  return `<div class="last-game-strip ${won?'win':'loss'}"><span>Last Game</span><strong>${won?'W':'L'} ${uw}-${ow} vs ${escapeHTML(opponent.name)}</strong><small>${escapeHTML(story)}</small></div>`;
+}
+
+function seasonHubHTML(nextOpponent){
+  const st=userSeasonStanding();
+  const rank=userSeasonRank();
+  const streak=userSeasonStreak();
+  const mvp=currentUserMvp();
+  const mvpP=mvp?pokemonById(mvp.pokemonId):null;
+  const nextRecord=nextOpponent?teamRecordText(nextOpponent.id):'';
+  const last=lastUserPlayedGame();
+  return `<section class="panel season-hub">
+    <div class="season-hub-head"><div><span class="eyebrow">Season Hub</span><h2>${escapeHTML(userTeam().name)}</h2></div><span class="hub-week">${state.season.week<14?`Week ${state.season.week} / 14`:'Postseason'}</span></div>
+    <div class="season-hub-grid">
+      <div class="hub-stat primary"><span>Record</span><strong>${st.w}-${st.l}</strong></div>
+      <div class="hub-stat"><span>League Rank</span><strong>${rank?`#${rank}`:'—'}</strong></div>
+      <div class="hub-stat"><span>Streak</span><strong class="${streak.type}">${streak.text}</strong></div>
+      <div class="hub-stat"><span>Playoff Picture</span><strong>${playoffPictureText()}</strong></div>
+      <div class="hub-feature"><span>Next Opponent</span>${nextOpponent?`<strong>${escapeHTML(nextOpponent.name)}</strong><small>${nextRecord} record</small>`:'<strong>Season complete</strong><small>No game scheduled</small>'}</div>
+      <div class="hub-feature mvp"><span>Team MVP</span>${mvpP?`<div><img src="${mvpP.sprite}" onerror="this.src='${spriteFallback(mvpP.id)}'" alt=""><strong>${mvpP.name}</strong></div><small>${mvp.w}-${mvp.l} • ${mvp.kos} KO</small>`:'<strong>Not yet</strong><small>Stats begin after Week 1</small>'}</div>
+    </div>
+    ${last?lastGameHighlight(last):''}
+  </section>`;
+}
+
 function renderSeason(){
   const s=state.season, standings=rankedStandings();
   const userGames=s.schedule.filter(g=>g.homeId==='user'||g.awayId==='user');
   const regularGame=nextUserGame();
   const regularOpponent=regularGame?teamById(regularGame.homeId==='user'?regularGame.awayId:regularGame.homeId):null;
-  const playoffOpponent=s.week>=14?currentPlayoffUserOpponent():null;
-  const matchup=regularOpponent?matchupPanelHTML(regularOpponent,`Week ${s.week+1}`):playoffOpponent?matchupPanelHTML(playoffOpponent,state.season.playoffPhase==='semis'?'Playoff Semifinal':'Championship Match'):'';
+  let opponentOrder=null;
+  if(regularGame&&regularOpponent){
+    if(!regularGame.cpuOrder) regularGame.cpuOrder=cpuStrategicOrder(regularOpponent,userTeam());
+    opponentOrder=regularGame.cpuOrder;
+  }
+  const playoffGame=s.week>=14?currentPlayoffUserGame():null;
+  const playoffOpponent=playoffGame?teamById(playoffGame.aId==='user'?playoffGame.bId:playoffGame.aId):null;
+  if(playoffGame&&playoffOpponent){
+    if(!playoffGame.cpuOrder) playoffGame.cpuOrder=cpuStrategicOrder(playoffOpponent,userTeam());
+    opponentOrder=playoffGame.cpuOrder;
+  }
+  const nextOpponent=regularOpponent || playoffOpponent;
+  const matchup=regularOpponent?matchupPanelHTML(regularOpponent,`Week ${s.week+1}`,opponentOrder):playoffOpponent?matchupPanelHTML(playoffOpponent,state.season.playoffPhase==='semis'?'Playoff Semifinal':'Championship Match',opponentOrder):'';
   const title=s.week<14?'Regular Season':'Playoffs';
   const subtitle=s.week<14?`Week ${s.week} of 14`:`Regular season: ${state.season.standings.find(x=>x.teamId==='user').w}-${state.season.standings.find(x=>x.teamId==='user').l}`;
   const playoffButtonText=s.playoffPhase==='semis'?'Sim Semifinals':s.playoffPhase==='final'?'Sim Championship':'';
@@ -1161,6 +1377,7 @@ function renderSeason(){
   const playoffNote=!madePlayoffs?'You did not qualify for the playoffs.':s.playoffPhase==='final'?'Your playoff run is over.':'Playoffs ready.';
 
   app.innerHTML=shell(`<div class="section-title"><div><h1>${title}</h1><p>${subtitle}</p></div></div>
+  ${seasonHubHTML(nextOpponent)}
   ${matchup}
   <div class="season-actions">
     ${s.week<14?`<button class="btn primary" id="playWeek">Sim Week ${s.week+1}</button><button class="btn" id="simAll">Sim to Playoffs</button>`:''}
@@ -1199,10 +1416,10 @@ function gameRowHTML(g){
 function showGameModal(index){
   const g=state.season.schedule[index]; if(!g?.played)return;
   const home=teamById(g.homeId), away=teamById(g.awayId);
-  state.modal={title:`${home.name} vs ${away.name}`,html:`<div class="battle-list">${g.result.battles.map(b=>{
-    const a=pokemonById(b.aId), c=pokemonById(b.bId);
-    return `<div class="battle-row"><span class="${b.winnerId===a.id?'winner':''}">${a.name}</span><span>VS</span><span class="${b.winnerId===c.id?'winner':''}">${c.name}</span></div>`;
-  }).join('')}</div><p><strong>Final: ${g.result.aWins}-${g.result.bWins}</strong></p>`};
+  state.modal={title:`${home.name} vs ${away.name}`,html:`
+    <div class="battle-modal-score"><span>${escapeHTML(home.name)}</span><strong>${g.result.aWins}-${g.result.bWins}</strong><span>${escapeHTML(away.name)}</span></div>
+    <p class="battle-feedback-intro">Battle feedback shows the biggest stat, Speed and type factors behind each 1v1 result. Upsets mean the random battle roll overcame the pre-battle edge.</p>
+    ${battleRecapHTML(g.result)}`};
   renderModal();
 }
 
@@ -1224,10 +1441,8 @@ function showPlayoffGameModal(key){
       <div><span>#${playoffSeed(b.id)} ${escapeHTML(b.name)}</span><small>${bSt?`${bSt.w}-${bSt.l} regular season`:''}</small><strong>${game.result.bWins}</strong></div>
     </div>
     <p class="playoff-modal-winner"><strong>${escapeHTML(winner.name)}</strong> advances${key==='final'?' as league champion':''}.</p>
-    <div class="battle-list">${game.result.battles.map(battle=>{
-      const left=pokemonById(battle.aId), right=pokemonById(battle.bId);
-      return `<div class="battle-row"><span class="${battle.winnerId===left.id?'winner':''}">${left.name}</span><span>VS</span><span class="${battle.winnerId===right.id?'winner':''}">${right.name}</span></div>`;
-    }).join('')}</div>`};
+    <p class="battle-feedback-intro">Battle feedback shows the biggest stat, Speed and type factors behind each 1v1 result.</p>
+    ${battleRecapHTML(game.result)}`};
   renderModal();
 }
 
@@ -1398,7 +1613,7 @@ function settingsInstructionsHTML(){
   <div class="how-to-play-grid">
     <article class="how-step"><span>1</span><div><strong>Draw Your Draft Slot</strong><p>Every league begins with a random 1–8 draft position. The draft snakes for six rounds, so everyone finishes with six Pokémon.</p></div></article>
     <article class="how-step"><span>2</span><div><strong>Build Your Team</strong><p>Use base stats, typing, speed and roster balance to decide who to draft. Every Pokémon can only be selected once.</p></div></article>
-    <article class="how-step"><span>3</span><div><strong>Set Your Battle Order</strong><p>Before each game, arrange your six Pokémon from 1–6. Each slot battles the Pokémon in the same hidden CPU slot.</p></div></article>
+    <article class="how-step"><span>3</span><div><strong>Set Your Battle Order</strong><p>Before each game, scout the CPU's locked order and arrange your six Pokémon from 1–6. Each slot battles the Pokémon directly across from it.</p></div></article>
     <article class="how-step"><span>4</span><div><strong>Win Matchups</strong><p>Battle results use all six base stats, real dual-type effectiveness, speed and controlled randomness. Smart type matchups can overcome stronger Pokémon.</p></div></article>
     <article class="how-step"><span>5</span><div><strong>Reach the Playoffs</strong><p>Play a 14-game regular season. The top four teams advance to the semifinals, then the winners meet for the championship.</p></div></article>
     <article class="how-step"><span>6</span><div><strong>Build Your Legacy</strong><p>Earn trainer badges, track career stats and revisit every championship roster in the Hall of Champions.</p></div></article>
@@ -1525,7 +1740,7 @@ async function init(){
         window.location.reload();
       });
 
-      navigator.serviceWorker.register('./sw.js?v=1.12.0',{updateViaCache:'none'})
+      navigator.serviceWorker.register('./sw.js?v=1.13.0',{updateViaCache:'none'})
         .then(reg=>{
           const activateNow=worker=>{
             if(worker) worker.postMessage({type:'SKIP_WAITING'});
