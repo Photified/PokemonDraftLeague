@@ -936,16 +936,86 @@ function moveUserLineup(id,direction){
   renderSeason();
 }
 
-function playoffLiveHTML(){
+function playoffStanding(teamId){
+  return state.season?.standings?.find(x=>x.teamId===teamId) || null;
+}
+
+function playoffSeed(teamId){
+  return state.season?.playoffs?.seeds?.find(x=>x.teamId===teamId)?.seed || null;
+}
+
+function playoffScore(game,teamId){
+  if(!game?.result) return null;
+  if(game.aId===teamId) return game.result.aWins;
+  if(game.bId===teamId) return game.result.bWins;
+  return null;
+}
+
+function playoffTeamRowHTML(teamId,game){
+  if(!teamId){
+    return `<div class="bracket-team bracket-team-tbd"><span class="bracket-seed">—</span><span class="bracket-team-copy"><strong>TBD</strong><small>Awaiting semifinal</small></span><span class="bracket-score">—</span></div>`;
+  }
+  const team=teamById(teamId);
+  const st=playoffStanding(teamId);
+  const seed=playoffSeed(teamId);
+  const score=playoffScore(game,teamId);
+  const won=!!game?.result && game.result.winnerId===teamId;
+  const lost=!!game?.result && game.result.winnerId!==teamId;
+  return `<div class="bracket-team ${won?'winner':''} ${lost?'loser':''} ${teamId==='user'?'you':''}">
+    <span class="bracket-seed">${seed?`#${seed}`:'—'}</span>
+    <span class="bracket-team-copy"><strong>${escapeHTML(team.name)}</strong><small>${st?`${st.w}-${st.l} regular season`:'Record unavailable'}</small></span>
+    <span class="bracket-score">${score===null?'—':score}</span>
+  </div>`;
+}
+
+function playoffUpsetHTML(game){
+  if(!game?.result) return '';
+  const winnerSeed=playoffSeed(game.result.winnerId);
+  const loserId=game.result.winnerId===game.aId?game.bId:game.aId;
+  const loserSeed=playoffSeed(loserId);
+  return winnerSeed && loserSeed && winnerSeed>loserSeed ? `<span class="bracket-upset">Upset</span>` : '';
+}
+
+function playoffMatchHTML(game,label,key){
+  const clickable=!!game?.result;
+  const Tag=clickable?'button':'div';
+  const attrs=clickable?` type="button" data-playoff-game="${key}" aria-label="View ${label} details"`:'';
+  return `<${Tag} class="bracket-match ${clickable?'complete':''}"${attrs}>
+    <div class="bracket-match-top"><span>${label}</span>${game?.result?`<span class="bracket-final-label">Final</span>${playoffUpsetHTML(game)}`:'<span class="bracket-pending">Pending</span>'}</div>
+    ${playoffTeamRowHTML(game?.aId || null,game)}
+    ${playoffTeamRowHTML(game?.bId || null,game)}
+  </${Tag}>`;
+}
+
+function playoffBracketHTML(compact=false){
   const p=state.season.playoffs;
   if(!p) return '';
-  const semiRows=p.semis.map(g=>{
-    const a=teamById(g.aId),b=teamById(g.bId);
-    const result=g.result?`<strong>${teamById(g.result.winnerId).name}</strong>`:'<span class="muted">Pending</span>';
-    return `<div class="cpu-row"><span>${a.name} vs ${b.name}</span>${result}</div>`;
-  }).join('');
-  const finalRow=p.final?`<div class="cpu-row"><span>Championship: ${teamById(p.final.aId).name} vs ${teamById(p.final.bId).name}</span>${p.final.result?`<strong>${teamById(p.final.result.winnerId).name}</strong>`:'<span class="muted">Pending</span>'}</div>`:'';
-  return `<div class="cpu-list">${semiRows}${finalRow}</div>`;
+  const finalGame=p.final || {aId:null,bId:null,result:null};
+  const championId=p.final?.result?.winnerId || null;
+  const champion=championId?teamById(championId):null;
+  const championStanding=championId?playoffStanding(championId):null;
+  return `<div class="playoff-bracket-wrap ${compact?'compact':''}">
+    <div class="playoff-bracket">
+      <div class="bracket-round bracket-semis-stage">
+        <div class="bracket-round-title"><span>Semifinals</span><small>#1 vs #4 • #2 vs #3</small></div>
+        <div class="bracket-semi-stack">
+          ${playoffMatchHTML(p.semis[0],'Semifinal 1','semi-0')}
+          ${playoffMatchHTML(p.semis[1],'Semifinal 2','semi-1')}
+        </div>
+      </div>
+      <div class="bracket-connector" aria-hidden="true"><i class="branch-top"></i><i class="branch-bottom"></i><i class="branch-spine"></i><i class="branch-final"></i></div>
+      <div class="bracket-round bracket-final-stage">
+        <div class="bracket-round-title"><span>Championship</span><small>Winners advance</small></div>
+        ${playoffMatchHTML(finalGame,'League Final','final')}
+        ${champion?`<div class="bracket-champion">${goldBadgeHTML('tiny')}<div><span>League Champion</span><strong>${escapeHTML(champion.name)}</strong><small>${championStanding?`${championStanding.w}-${championStanding.l} regular season • #${playoffSeed(championId)} seed`:'Champions'}</small></div></div>`:''}
+      </div>
+    </div>
+    ${p.semis.some(g=>g.result)||p.final?.result?'<p class="bracket-hint">Tap a completed playoff matchup to view all six battles.</p>':''}
+  </div>`;
+}
+
+function playoffLiveHTML(){
+  return playoffBracketHTML(false);
 }
 
 function simToPlayoffs(){
@@ -981,6 +1051,7 @@ function renderSeason(){
     ${s.week>=14&&!s.complete&&playoffButtonText?`<button class="btn primary" id="playoffsBtn">${playoffButtonText}</button>`:''}
   </div>
   ${s.week>=14&&!userAlive&&!s.complete?`<div class="panel playoff-note"><strong>${playoffNote}</strong><span class="muted"> You can still simulate the remaining round.</span></div>`:''}
+  ${s.week>=14?`<section class="panel playoff-panel"><div class="playoff-panel-head"><div><h3>Playoff Bracket</h3><p>Seeds and records are from the regular season.</p></div></div>${playoffLiveHTML()}</section>`:''}
   <div class="season-grid">
     <section class="panel"><h3>Standings</h3><table class="standings"><thead><tr><th>#</th><th>Team</th><th>W</th><th>L</th><th>PF</th><th>PA</th></tr></thead><tbody>${standings.map((x,i)=>`<tr class="${x.teamId==='user'?'you':''}"><td>${i+1}</td><td>${teamById(x.teamId).name}</td><td>${x.w}</td><td>${x.l}</td><td>${x.pf}</td><td>${x.pa}</td></tr>`).join('')}</tbody></table>${s.week>=14?'<p class="muted small" style="margin-top:10px">Top four qualified for the playoffs.</p>':''}</section>
     <section class="panel"><h3>Your Pokémon</h3>${playerStatsTableHTML('user')}</section>
@@ -988,8 +1059,7 @@ function renderSeason(){
   <div class="season-lower-grid">
     <section class="panel"><h3>Your Schedule</h3><div class="schedule">${userGames.map(gameRowHTML).join('')}</div></section>
     <section class="panel"><h3>League Leaders</h3>${leagueLeadersHTML()}</section>
-  </div>
-  ${s.week>=14?`<section class="panel playoff-panel"><h3>Playoff Bracket</h3>${playoffLiveHTML()}</section>`:''}`);
+  </div>`);
 
   const play=document.getElementById('playWeek'); if(play) play.onclick=playWeek;
   const all=document.getElementById('simAll'); if(all) all.onclick=simToPlayoffs;
@@ -997,6 +1067,7 @@ function renderSeason(){
   document.querySelectorAll('[data-lineup-up]').forEach(btn=>btn.onclick=()=>moveUserLineup(Number(btn.dataset.lineupUp),-1));
   document.querySelectorAll('[data-lineup-down]').forEach(btn=>btn.onclick=()=>moveUserLineup(Number(btn.dataset.lineupDown),1));
   document.querySelectorAll('[data-game-index]').forEach(btn=>btn.onclick=()=>showGameModal(Number(btn.dataset.gameIndex)));
+  document.querySelectorAll('[data-playoff-game]').forEach(btn=>btn.onclick=()=>showPlayoffGameModal(btn.dataset.playoffGame));
 }
 
 function gameRowHTML(g){
@@ -1015,6 +1086,31 @@ function showGameModal(index){
     const a=pokemonById(b.aId), c=pokemonById(b.bId);
     return `<div class="battle-row"><span class="${b.winnerId===a.id?'winner':''}">${a.name}</span><span>VS</span><span class="${b.winnerId===c.id?'winner':''}">${c.name}</span></div>`;
   }).join('')}</div><p><strong>Final: ${g.result.aWins}-${g.result.bWins}</strong></p>`};
+  renderModal();
+}
+
+function showPlayoffGameModal(key){
+  const p=state.season?.playoffs;
+  if(!p) return;
+  let game=null,label='Playoff Match';
+  if(key==='semi-0'){game=p.semis[0];label='Semifinal 1';}
+  else if(key==='semi-1'){game=p.semis[1];label='Semifinal 2';}
+  else if(key==='final'){game=p.final;label='Championship';}
+  if(!game?.result) return;
+  const a=teamById(game.aId), b=teamById(game.bId);
+  const aSt=playoffStanding(a.id), bSt=playoffStanding(b.id);
+  const winner=teamById(game.result.winnerId);
+  state.modal={title:`${label}: ${a.name} vs ${b.name}`,html:`
+    <div class="playoff-modal-summary">
+      <div><span>#${playoffSeed(a.id)} ${escapeHTML(a.name)}</span><small>${aSt?`${aSt.w}-${aSt.l} regular season`:''}</small><strong>${game.result.aWins}</strong></div>
+      <b>FINAL</b>
+      <div><span>#${playoffSeed(b.id)} ${escapeHTML(b.name)}</span><small>${bSt?`${bSt.w}-${bSt.l} regular season`:''}</small><strong>${game.result.bWins}</strong></div>
+    </div>
+    <p class="playoff-modal-winner"><strong>${escapeHTML(winner.name)}</strong> advances${key==='final'?' as league champion':''}.</p>
+    <div class="battle-list">${game.result.battles.map(battle=>{
+      const left=pokemonById(battle.aId), right=pokemonById(battle.bId);
+      return `<div class="battle-row"><span class="${battle.winnerId===left.id?'winner':''}">${left.name}</span><span>VS</span><span class="${battle.winnerId===right.id?'winner':''}">${right.name}</span></div>`;
+    }).join('')}</div>`};
   renderModal();
 }
 
@@ -1104,12 +1200,11 @@ function renderRecap(){
   document.getElementById('draftAgain').onclick=()=>{state.screen='setup';render();};
   document.getElementById('badgesBtn').onclick=()=>{state.screen='challenges';render();};
   document.getElementById('homeBtn').onclick=()=>{state.screen='home';render();};
+  document.querySelectorAll('[data-playoff-game]').forEach(btn=>btn.onclick=()=>showPlayoffGameModal(btn.dataset.playoffGame));
 }
 
 function playoffHTML(p){
-  const semi=p.semis.map((g,i)=>`<div class="cpu-row"><span>#${p.seeds.find(s=>s.teamId===g.aId)?.seed||''} ${teamById(g.aId).name} vs #${p.seeds.find(s=>s.teamId===g.bId)?.seed||''} ${teamById(g.bId).name}</span><strong>${teamById(g.result.winnerId).name}</strong></div>`).join('');
-  const f=p.final;
-  return `<div class="cpu-list">${semi}<div class="cpu-row"><span>Championship: ${teamById(f.aId).name} vs ${teamById(f.bId).name}</span><strong>${teamById(f.result.winnerId).name}</strong></div></div>`;
+  return playoffBracketHTML(true);
 }
 
 function showCareerModal(){

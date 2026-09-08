@@ -750,3 +750,93 @@ h1,h2,h3,p { margin-top: 0; }
 }
 .career-lists { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:16px; }
 @media (max-width:560px){ .career-lists { grid-template-columns:1fr; } }
+
+/* v1.6 playoff bracket */
+.playoff-panel { margin-top: 0; margin-bottom: 16px; overflow: hidden; }
+.playoff-panel-head { display: flex; justify-content: space-between; align-items: end; gap: 12px; margin-bottom: 14px; }
+.playoff-panel-head h3 { margin: 0; }
+.playoff-panel-head p { margin: 3px 0 0; color: var(--muted); font-size: .72rem; }
+.playoff-bracket-wrap { min-width: 0; }
+.playoff-bracket { display: grid; grid-template-columns: minmax(0,1fr) 72px minmax(0,1fr); align-items: center; gap: 0; min-width: 0; }
+.bracket-round { min-width: 0; }
+.bracket-round-title { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 9px; }
+.bracket-round-title span { color: var(--accent); font-size: .7rem; font-weight: 1000; text-transform: uppercase; letter-spacing: .1em; }
+.bracket-round-title small { color: var(--muted); font-size: .58rem; text-align: right; }
+.bracket-semi-stack { display: grid; gap: 22px; }
+.bracket-final-stage .bracket-match { margin: 0; }
+.bracket-match { appearance: none; width: 100%; min-width: 0; padding: 0; overflow: hidden; border: 1px solid #374255; border-radius: 14px; background: #11161f; color: var(--text); text-align: left; box-shadow: 0 8px 22px rgba(0,0,0,.12); }
+button.bracket-match { cursor: pointer; transition: border-color .14s ease, transform .14s ease, filter .14s ease; }
+button.bracket-match:hover { border-color: #65738a; transform: translateY(-1px); filter: brightness(1.04); }
+.bracket-match-top { min-height: 28px; display: flex; align-items: center; gap: 6px; padding: 6px 9px; border-bottom: 1px solid #2b3442; background: #181f2a; }
+.bracket-match-top > span:first-child { margin-right: auto; color: #c8d0dc; font-size: .58rem; font-weight: 900; text-transform: uppercase; letter-spacing: .08em; }
+.bracket-final-label, .bracket-pending, .bracket-upset { flex: 0 0 auto; border-radius: 999px; padding: 3px 6px; font-size: .48rem; font-weight: 1000; text-transform: uppercase; letter-spacing: .07em; }
+.bracket-final-label { color: #b8c3d2; background: #252e3b; }
+.bracket-pending { color: #7f8ca0; background: #202735; }
+.bracket-upset { color: #ffca74; background: rgba(255,168,64,.11); border: 1px solid rgba(255,168,64,.2); }
+.bracket-team { display: grid; grid-template-columns: 34px minmax(0,1fr) 28px; align-items: center; gap: 7px; min-height: 52px; padding: 6px 9px; border-bottom: 1px solid #29313e; transition: background .14s ease, opacity .14s ease; }
+.bracket-team:last-child { border-bottom: 0; }
+.bracket-team.winner { background: linear-gradient(90deg, rgba(85,209,139,.10), transparent 72%); }
+.bracket-team.loser { opacity: .57; }
+.bracket-team.you { box-shadow: inset 3px 0 0 var(--accent); }
+.bracket-team-tbd { opacity: .52; }
+.bracket-seed { display: grid; place-items: center; width: 30px; height: 26px; border-radius: 8px; background: #202836; color: var(--accent); font-size: .62rem; font-weight: 1000; }
+.bracket-team-copy { min-width: 0; }
+.bracket-team-copy strong { display: block; font-size: .76rem; line-height: 1.13; overflow-wrap: anywhere; }
+.bracket-team-copy small { display: block; margin-top: 3px; color: var(--muted); font-size: .54rem; line-height: 1.15; }
+.bracket-score { text-align: right; font-size: 1.05rem; font-weight: 1000; font-variant-numeric: tabular-nums; }
+.bracket-team.winner .bracket-score { color: var(--success); }
+.bracket-connector { position: relative; min-height: 250px; }
+.bracket-connector i { position: absolute; display: block; border-color: #465267; }
+.bracket-connector .branch-top { left: 0; right: 50%; top: 27%; border-top: 2px solid #465267; }
+.bracket-connector .branch-bottom { left: 0; right: 50%; top: 73%; border-top: 2px solid #465267; }
+.bracket-connector .branch-spine { left: 50%; top: 27%; height: 46%; border-left: 2px solid #465267; }
+.bracket-connector .branch-final { left: 50%; right: 0; top: 50%; border-top: 2px solid #465267; }
+.bracket-champion { display: flex; align-items: center; gap: 9px; margin-top: 12px; padding: 10px 12px; border: 1px solid rgba(255,213,74,.28); border-radius: 13px; background: linear-gradient(90deg,rgba(255,213,74,.10),rgba(255,213,74,.025)); }
+.bracket-champion > div { min-width: 0; }
+.bracket-champion span { display: block; color: #e3c866; font-size: .5rem; font-weight: 1000; text-transform: uppercase; letter-spacing: .1em; }
+.bracket-champion strong { display: block; margin-top: 2px; font-size: .82rem; overflow-wrap: anywhere; }
+.bracket-champion small { display: block; margin-top: 2px; color: var(--muted); font-size: .54rem; }
+.bracket-hint { margin: 10px 0 0; color: var(--muted); font-size: .6rem; text-align: center; }
+.playoff-modal-summary { display: grid; grid-template-columns: 1fr auto 1fr; gap: 10px; align-items: center; margin: 8px 0 12px; }
+.playoff-modal-summary > div { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; align-items: center; padding: 10px; border: 1px solid #303949; border-radius: 12px; background: #11161f; }
+.playoff-modal-summary span { min-width: 0; font-size: .74rem; font-weight: 900; overflow-wrap: anywhere; }
+.playoff-modal-summary small { grid-column: 1; color: var(--muted); font-size: .56rem; }
+.playoff-modal-summary strong { grid-column: 2; grid-row: 1 / span 2; font-size: 1.45rem; color: var(--accent); }
+.playoff-modal-summary > b { color: var(--muted); font-size: .56rem; letter-spacing: .08em; }
+.playoff-modal-winner { margin: 0 0 8px; color: var(--muted); font-size: .72rem; }
+.playoff-modal-winner strong { color: var(--text); }
+
+/* Compact bracket used in the season recap column. */
+.playoff-bracket-wrap.compact .playoff-bracket { grid-template-columns: 1fr; gap: 8px; }
+.playoff-bracket-wrap.compact .bracket-connector { min-height: 24px; height: 24px; }
+.playoff-bracket-wrap.compact .bracket-connector .branch-top,
+.playoff-bracket-wrap.compact .bracket-connector .branch-bottom,
+.playoff-bracket-wrap.compact .bracket-connector .branch-spine { display: none; }
+.playoff-bracket-wrap.compact .bracket-connector .branch-final { left: 50%; right: auto; top: 0; height: 24px; width: 0; border-top: 0; border-left: 2px solid #465267; }
+.playoff-bracket-wrap.compact .bracket-semi-stack { gap: 9px; }
+.playoff-bracket-wrap.compact .bracket-round-title { margin-top: 2px; }
+
+@media (max-width: 720px) {
+  .playoff-bracket { grid-template-columns: 1fr; gap: 8px; }
+  .bracket-semi-stack { gap: 9px; }
+  .bracket-connector { min-height: 28px; height: 28px; }
+  .bracket-connector .branch-top,
+  .bracket-connector .branch-bottom,
+  .bracket-connector .branch-spine { display: none; }
+  .bracket-connector .branch-final { left: 50%; right: auto; top: 0; height: 28px; width: 0; border-top: 0; border-left: 2px solid #465267; }
+  .bracket-final-stage .bracket-round-title { margin-top: 0; }
+  .bracket-team { min-height: 48px; grid-template-columns: 32px minmax(0,1fr) 26px; padding: 5px 8px; }
+  .bracket-seed { width: 28px; height: 24px; }
+}
+
+@media (max-width: 420px) {
+  .playoff-panel { padding: 13px; }
+  .playoff-panel-head { margin-bottom: 10px; }
+  .bracket-round-title small { font-size: .51rem; }
+  .bracket-match-top { min-height: 25px; padding: 5px 7px; }
+  .bracket-team-copy strong { font-size: .7rem; }
+  .bracket-team-copy small { font-size: .5rem; }
+  .bracket-score { font-size: .92rem; }
+  .playoff-modal-summary { grid-template-columns: 1fr; }
+  .playoff-modal-summary > b { text-align: center; }
+}

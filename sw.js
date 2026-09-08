@@ -1,4 +1,4 @@
-const CACHE = 'pokemon-draft-v1.5.0';
+const CACHE = 'pokemon-draft-v1.6.0';
 const CORE = ['./', './index.html', './style.css', './game.js', './manifest.json', './icon.svg'];
 
 self.addEventListener('install', event => {
