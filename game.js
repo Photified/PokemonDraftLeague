@@ -1041,13 +1041,13 @@ function finalizeCareer(){
 
 function lineupRowHTML(id,index){
   const p=pokemonById(id);
-  return `<div class="lineup-row">
+  return `<div class="lineup-row" data-lineup-slot="${index}">
     <span class="lineup-number">${index+1}</span>
     <button type="button" class="lineup-mon-trigger" data-pokemon-detail="${p.id}" aria-label="View ${p.name} stats">
       <img src="${p.sprite}" onerror="this.src='${spriteFallback(p.id)}'" alt="">
       <span class="lineup-name"><strong>${p.name}</strong><small>${p.types.join(' / ')}</small></span>
     </button>
-    <div class="lineup-controls"><button class="lineup-arrow" data-lineup-up="${p.id}" ${index===0?'disabled':''} aria-label="Move ${p.name} up">↑</button><button class="lineup-arrow" data-lineup-down="${p.id}" ${index===ROSTER_SIZE-1?'disabled':''} aria-label="Move ${p.name} down">↓</button></div>
+    <button type="button" class="lineup-drag-handle" data-lineup-drag="${p.id}" aria-label="Reorder ${p.name}. Drag to a new slot, or use the up and down arrow keys." title="Drag to reorder"><span aria-hidden="true">⠿</span></button>
   </div>`;
 }
 
@@ -1057,14 +1057,14 @@ function matchupOrderRowHTML(userId,opponentId,index){
   const edge=duelExpectedEdge(userP,oppP);
   const edgeClass=Math.abs(edge)<4?'even':edge>0?'you':'them';
   const edgeLabel=Math.abs(edge)<4?'Even':edge>0?'You':'CPU';
-  return `<div class="matchup-order-row">
-    <div class="matchup-side user-side">
+  return `<div class="matchup-order-row" data-lineup-slot="${index}">
+    <div class="matchup-side user-side" data-lineup-id="${userP.id}">
       <span class="lineup-number">${index+1}</span>
       <button type="button" class="lineup-mon-trigger" data-pokemon-detail="${userP.id}" aria-label="View ${userP.name} stats">
         <img src="${userP.sprite}" onerror="this.src='${spriteFallback(userP.id)}'" alt="">
         <span class="lineup-name"><strong>${userP.name}</strong><small>${userP.types.join(' / ')}</small></span>
       </button>
-      <div class="lineup-controls"><button class="lineup-arrow" data-lineup-up="${userP.id}" ${index===0?'disabled':''} aria-label="Move ${userP.name} up">↑</button><button class="lineup-arrow" data-lineup-down="${userP.id}" ${index===ROSTER_SIZE-1?'disabled':''} aria-label="Move ${userP.name} down">↓</button></div>
+      <button type="button" class="lineup-drag-handle" data-lineup-drag="${userP.id}" aria-label="Reorder ${userP.name}. Drag to a new slot, or use the up and down arrow keys." title="Drag to reorder"><span aria-hidden="true">⠿</span></button>
     </div>
     <div class="matchup-vs"><span>VS</span><small class="slot-edge ${edgeClass}">${edgeLabel}</small></div>
     <div class="matchup-side cpu-side">
@@ -1081,11 +1081,11 @@ function matchupPanelHTML(opponent,label,opponentOrder){
   const lockedOrder=(opponentOrder?.length?opponentOrder:cpuStrategicOrder(opponent,userTeam()));
   const preview=matchupPreview(userTeam(),opponent,state.season.userLineup,lockedOrder);
   return `<section class="panel matchup-panel">
-    <div class="matchup-head"><div><div class="eyebrow">${label}</div><h2>${escapeHTML(userTeam().name)} vs ${escapeHTML(opponent.name)}</h2><p>Opponent order is scouted and locked. Reorder your six Pokémon to choose the 1v1 matchups you want.</p></div><div class="projection"><b>${preview.pct}%</b><span>Projected Win</span></div></div>
+    <div class="matchup-head"><div><div class="eyebrow">${label}</div><h2>${escapeHTML(userTeam().name)} vs ${escapeHTML(opponent.name)}</h2><p>Opponent order is scouted and locked. Drag your six Pokémon into the slots you want to choose the 1v1 matchups.</p></div><div class="projection"><b>${preview.pct}%</b><span>Projected Win</span></div></div>
     <div class="matchup-order-head"><span>Your lineup</span><span></span><span>${escapeHTML(opponent.name)}</span></div>
     <div class="matchup-order-board">${state.season.userLineup.map((id,i)=>matchupOrderRowHTML(id,lockedOrder[i],i)).join('')}</div>
     <div class="matchup-edges">${preview.categories.map(([name,a,b])=>{const diff=a-b;const who=Math.abs(diff)<4?'Even':diff>0?'You':opponent.name;return `<div><span>${name}</span><strong class="${who==='You'?'edge-you':who==='Even'?'':'edge-them'}">${escapeHTML(who)}</strong></div>`;}).join('')}</div>
-    <p class="matchup-scout-note">The CPU lineup will not change after you see it. Moving your Pokémon changes the projected win chance immediately.</p>
+    <p class="matchup-scout-note">The CPU lineup will not change after you see it. Drag a Pokémon by the handle and the projected win chance updates after you drop it.</p>
   </section>`;
 }
 
@@ -1107,6 +1107,110 @@ function moveUserLineup(id,direction){
   if(index<0||target<0||target>=arr.length) return;
   [arr[index],arr[target]]=[arr[target],arr[index]];
   renderSeason();
+}
+
+function moveUserLineupToIndex(id,targetIndex){
+  const arr=state.season.userLineup;
+  const from=arr.indexOf(id);
+  const target=clamp(Number(targetIndex),0,arr.length-1);
+  if(from<0 || from===target) return false;
+  const [moved]=arr.splice(from,1);
+  arr.splice(target,0,moved);
+  return true;
+}
+
+function bindLineupDrag(){
+  document.querySelectorAll('[data-lineup-drag]').forEach(handle=>{
+    handle.addEventListener('keydown',event=>{
+      const id=Number(handle.dataset.lineupDrag);
+      if(event.key==='ArrowUp'){
+        event.preventDefault();
+        moveUserLineup(id,-1);
+      } else if(event.key==='ArrowDown'){
+        event.preventDefault();
+        moveUserLineup(id,1);
+      } else if(event.key==='Home'){
+        event.preventDefault();
+        if(moveUserLineupToIndex(id,0)) renderSeason();
+      } else if(event.key==='End'){
+        event.preventDefault();
+        if(moveUserLineupToIndex(id,state.season.userLineup.length-1)) renderSeason();
+      }
+    });
+
+    handle.addEventListener('pointerdown',event=>{
+      if(event.pointerType==='mouse' && event.button!==0) return;
+      const id=Number(handle.dataset.lineupDrag);
+      const startIndex=state.season.userLineup.indexOf(id);
+      const row=handle.closest('.matchup-order-row');
+      const source=row?.querySelector('.user-side');
+      if(startIndex<0 || !row || !source) return;
+
+      event.preventDefault();
+      const rect=source.getBoundingClientRect();
+      const ghost=source.cloneNode(true);
+      ghost.classList.add('lineup-drag-ghost');
+      ghost.removeAttribute('data-lineup-id');
+      ghost.querySelectorAll('button').forEach(btn=>btn.setAttribute('tabindex','-1'));
+      ghost.style.width=`${rect.width}px`;
+      document.body.appendChild(ghost);
+
+      let targetIndex=startIndex;
+      let active=true;
+      const xOffset=Math.min(Math.max(event.clientX-rect.left,18),rect.width-18);
+      const yOffset=Math.min(Math.max(event.clientY-rect.top,18),rect.height-18);
+
+      source.classList.add('drag-source');
+      document.body.classList.add('lineup-dragging');
+      handle.setAttribute('aria-grabbed','true');
+
+      const positionGhost=ev=>{
+        ghost.style.transform=`translate3d(${Math.round(ev.clientX-xOffset)}px,${Math.round(ev.clientY-yOffset)}px,0)`;
+      };
+      positionGhost(event);
+
+      const clearTargets=()=>document.querySelectorAll('.matchup-order-row.drag-target').forEach(el=>el.classList.remove('drag-target'));
+
+      const onMove=ev=>{
+        if(!active) return;
+        ev.preventDefault();
+        positionGhost(ev);
+
+        const hovered=document.elementFromPoint(ev.clientX,ev.clientY)?.closest('.matchup-order-row');
+        if(hovered?.dataset.lineupSlot!==undefined){
+          const next=Number(hovered.dataset.lineupSlot);
+          if(Number.isInteger(next)) targetIndex=next;
+          clearTargets();
+          hovered.classList.add('drag-target');
+        }
+
+        // Small edge scroll assist for phones when all six rows are not visible at once.
+        const edge=72;
+        if(ev.clientY<edge) window.scrollBy(0,-10);
+        else if(ev.clientY>window.innerHeight-edge) window.scrollBy(0,10);
+      };
+
+      const finish=()=>{
+        if(!active) return;
+        active=false;
+        document.removeEventListener('pointermove',onMove);
+        document.removeEventListener('pointerup',onUp);
+        document.removeEventListener('pointercancel',onCancel);
+        clearTargets();
+        ghost.remove();
+        document.body.classList.remove('lineup-dragging');
+        source.classList.remove('drag-source');
+        handle.removeAttribute('aria-grabbed');
+        if(moveUserLineupToIndex(id,targetIndex)) renderSeason();
+      };
+      const onUp=()=>finish();
+      const onCancel=()=>finish();
+
+      document.addEventListener('pointermove',onMove,{passive:false});
+      document.addEventListener('pointerup',onUp);
+      document.addEventListener('pointercancel',onCancel);
+    });
+  });
 }
 
 function playoffStanding(teamId){
@@ -1397,8 +1501,7 @@ function renderSeason(){
   const play=document.getElementById('playWeek'); if(play) play.onclick=playWeek;
   const all=document.getElementById('simAll'); if(all) all.onclick=simToPlayoffs;
   const po=document.getElementById('playoffsBtn'); if(po) po.onclick=simulatePlayoffs;
-  document.querySelectorAll('[data-lineup-up]').forEach(btn=>btn.onclick=()=>moveUserLineup(Number(btn.dataset.lineupUp),-1));
-  document.querySelectorAll('[data-lineup-down]').forEach(btn=>btn.onclick=()=>moveUserLineup(Number(btn.dataset.lineupDown),1));
+  bindLineupDrag();
   document.querySelectorAll('[data-game-index]').forEach(btn=>btn.onclick=()=>showGameModal(Number(btn.dataset.gameIndex)));
   document.querySelectorAll('[data-playoff-game]').forEach(btn=>btn.onclick=()=>showPlayoffGameModal(btn.dataset.playoffGame));
   bindPokemonDetailTriggers();
@@ -1613,7 +1716,7 @@ function settingsInstructionsHTML(){
   <div class="how-to-play-grid">
     <article class="how-step"><span>1</span><div><strong>Draw Your Draft Slot</strong><p>Every league begins with a random 1–8 draft position. The draft snakes for six rounds, so everyone finishes with six Pokémon.</p></div></article>
     <article class="how-step"><span>2</span><div><strong>Build Your Team</strong><p>Use base stats, typing, speed and roster balance to decide who to draft. Every Pokémon can only be selected once.</p></div></article>
-    <article class="how-step"><span>3</span><div><strong>Set Your Battle Order</strong><p>Before each game, scout the CPU's locked order and arrange your six Pokémon from 1–6. Each slot battles the Pokémon directly across from it.</p></div></article>
+    <article class="how-step"><span>3</span><div><strong>Set Your Battle Order</strong><p>Before each game, scout the CPU's locked order and drag your six Pokémon into the matchup slots you want. Each slot battles the Pokémon directly across from it.</p></div></article>
     <article class="how-step"><span>4</span><div><strong>Win Matchups</strong><p>Battle results use all six base stats, real dual-type effectiveness, speed and controlled randomness. Smart type matchups can overcome stronger Pokémon.</p></div></article>
     <article class="how-step"><span>5</span><div><strong>Reach the Playoffs</strong><p>Play a 14-game regular season. The top four teams advance to the semifinals, then the winners meet for the championship.</p></div></article>
     <article class="how-step"><span>6</span><div><strong>Build Your Legacy</strong><p>Earn trainer badges, track career stats and revisit every championship roster in the Hall of Champions.</p></div></article>
@@ -1740,7 +1843,7 @@ async function init(){
         window.location.reload();
       });
 
-      navigator.serviceWorker.register('./sw.js?v=1.13.0',{updateViaCache:'none'})
+      navigator.serviceWorker.register('./sw.js?v=1.14.0',{updateViaCache:'none'})
         .then(reg=>{
           const activateNow=worker=>{
             if(worker) worker.postMessage({type:'SKIP_WAITING'});
