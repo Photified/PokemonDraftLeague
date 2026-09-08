@@ -1,5 +1,5 @@
-const CACHE = 'pokemon-draft-v1.6.0';
-const CORE = ['./', './index.html', './style.css', './game.js', './manifest.json', './icon.svg'];
+const CACHE = 'pokemon-draft-v1.7.0';
+const CORE = ['./', './index.html', './style.css?v=1.7.0', './game.js?v=1.7.0', './manifest.json?v=1.7.0', './icon.svg'];
 
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(CORE)));
@@ -19,9 +19,12 @@ self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
   if (url.origin !== self.location.origin) return;
 
-  event.respondWith(
-    caches.match(event.request).then(cached => {
-      const network = fetch(event.request)
+  const isAppShell = event.request.mode === 'navigate' ||
+    /\/(index\.html|style\.css|game\.js|manifest\.json)$/.test(url.pathname);
+
+  if (isAppShell) {
+    event.respondWith(
+      fetch(event.request)
         .then(response => {
           if (response && response.ok) {
             const copy = response.clone();
@@ -29,8 +32,18 @@ self.addEventListener('fetch', event => {
           }
           return response;
         })
-        .catch(() => cached);
-      return cached || network;
-    })
+        .catch(() => caches.match(event.request).then(cached => cached || caches.match('./index.html')))
+    );
+    return;
+  }
+
+  event.respondWith(
+    caches.match(event.request).then(cached => cached || fetch(event.request).then(response => {
+      if (response && response.ok) {
+        const copy = response.clone();
+        caches.open(CACHE).then(cache => cache.put(event.request, copy));
+      }
+      return response;
+    }))
   );
 });

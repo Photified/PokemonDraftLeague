@@ -817,26 +817,84 @@ button.bracket-match:hover { border-color: #65738a; transform: translateY(-1px);
 .playoff-bracket-wrap.compact .bracket-round-title { margin-top: 2px; }
 
 @media (max-width: 720px) {
-  .playoff-bracket { grid-template-columns: 1fr; gap: 8px; }
-  .bracket-semi-stack { gap: 9px; }
-  .bracket-connector { min-height: 28px; height: 28px; }
-  .bracket-connector .branch-top,
-  .bracket-connector .branch-bottom,
-  .bracket-connector .branch-spine { display: none; }
-  .bracket-connector .branch-final { left: 50%; right: auto; top: 0; height: 28px; width: 0; border-top: 0; border-left: 2px solid #465267; }
-  .bracket-final-stage .bracket-round-title { margin-top: 0; }
-  .bracket-team { min-height: 48px; grid-template-columns: 32px minmax(0,1fr) 26px; padding: 5px 8px; }
-  .bracket-seed { width: 28px; height: 24px; }
+  /* Mobile gets a purpose-built vertical bracket instead of a flattened results list. */
+  .playoff-panel { padding: 14px; }
+  .playoff-panel-head { margin-bottom: 12px; }
+  .playoff-bracket { grid-template-columns: 1fr; gap: 0; }
+  .bracket-round-title { margin-bottom: 8px; }
+  .bracket-round-title span { font-size: .66rem; }
+  .bracket-round-title small { font-size: .52rem; }
+  .bracket-semi-stack { gap: 10px; }
+  .bracket-match { border-radius: 13px; box-shadow: none; }
+  .bracket-match-top { min-height: 27px; padding: 5px 8px; }
+  .bracket-team { min-height: 51px; grid-template-columns: 31px minmax(0,1fr) 28px; gap: 8px; padding: 6px 8px; }
+  .bracket-seed { width: 28px; height: 25px; }
+  .bracket-team-copy strong { font-size: .76rem; }
+  .bracket-team-copy small { font-size: .52rem; }
+  .bracket-score { font-size: 1rem; }
+
+  .bracket-connector {
+    position: relative;
+    min-height: 46px;
+    height: 46px;
+    display: grid;
+    place-items: center;
+  }
+  .bracket-connector i { display: none !important; }
+  .bracket-connector::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 0;
+    bottom: 0;
+    border-left: 2px solid #465267;
+    transform: translateX(-50%);
+  }
+  .bracket-connector::after {
+    content: 'WINNERS ADVANCE';
+    position: relative;
+    z-index: 1;
+    padding: 4px 8px;
+    border: 1px solid #465267;
+    border-radius: 999px;
+    background: #181f2a;
+    color: #9ba8ba;
+    font-size: .46rem;
+    font-weight: 1000;
+    letter-spacing: .08em;
+  }
+
+  .bracket-final-stage {
+    padding: 10px;
+    border: 1px solid rgba(255,213,74,.18);
+    border-radius: 15px;
+    background: linear-gradient(180deg,rgba(255,213,74,.055),rgba(17,22,31,.35));
+  }
+  .bracket-final-stage .bracket-round-title { margin: 0 0 8px; }
+  .bracket-final-stage .bracket-round-title span { color: #f4d765; }
+  .bracket-final-stage .bracket-round-title small { display: none; }
+  .bracket-champion { margin-top: 9px; }
+  .bracket-hint { line-height: 1.35; }
+
+  /* Keep the recap bracket compact, but retain the same visual hierarchy. */
+  .playoff-bracket-wrap.compact .bracket-connector { min-height: 38px; height: 38px; }
+  .playoff-bracket-wrap.compact .bracket-connector::after { content: 'FINAL'; }
 }
 
 @media (max-width: 420px) {
-  .playoff-panel { padding: 13px; }
-  .playoff-panel-head { margin-bottom: 10px; }
-  .bracket-round-title small { font-size: .51rem; }
+  .playoff-panel { padding: 12px; }
+  .playoff-panel-head h3 { font-size: 1.08rem; }
+  .playoff-panel-head p { font-size: .64rem; }
+  .bracket-round-title small { font-size: .49rem; }
   .bracket-match-top { min-height: 25px; padding: 5px 7px; }
-  .bracket-team-copy strong { font-size: .7rem; }
-  .bracket-team-copy small { font-size: .5rem; }
+  .bracket-match-top > span:first-child { font-size: .54rem; }
+  .bracket-final-label, .bracket-pending, .bracket-upset { font-size: .43rem; padding: 3px 5px; }
+  .bracket-team { min-height: 49px; grid-template-columns: 29px minmax(0,1fr) 26px; gap: 7px; padding: 5px 7px; }
+  .bracket-seed { width: 27px; height: 23px; font-size: .58rem; }
+  .bracket-team-copy strong { font-size: .72rem; }
+  .bracket-team-copy small { font-size: .49rem; }
   .bracket-score { font-size: .92rem; }
+  .bracket-final-stage { padding: 8px; }
   .playoff-modal-summary { grid-template-columns: 1fr; }
   .playoff-modal-summary > b { text-align: center; }
 }

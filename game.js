@@ -1236,7 +1236,11 @@ async function init(){
     state.pokemon=await loadPokemonData();
     state.screen='home';
     render();
-    if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(()=>{});
+    if('serviceWorker' in navigator){
+      navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'})
+        .then(reg=>reg.update())
+        .catch(()=>{});
+    }
   }catch(err){
     console.error(err);
     app.innerHTML=shell(`<div class="error-box"><h2>Couldn’t load Pokémon data</h2><p>${escapeHTML(err.message||'Unknown error')}</p><p class="small">Check your connection and reload. Once the Gen 1 data loads successfully it is cached locally for future sessions.</p><button class="btn" onclick="location.reload()">Retry</button></div>`);
