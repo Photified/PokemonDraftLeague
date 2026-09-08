@@ -89,7 +89,7 @@ career.pokemonSeasonWins = career.pokemonSeasonWins || {};
 career.championshipTeams = Array.isArray(career.championshipTeams) ? career.championshipTeams : [];
 career.challengeBadges = career.challengeBadges && typeof career.challengeBadges==='object' ? career.challengeBadges : {};
 
-const savedSettings = loadJSON(SETTINGS_KEY, { teamName: 'Kanto Kings', draftSlot: 4 });
+const savedSettings = loadJSON(SETTINGS_KEY, { teamName: 'Kanto Kings' });
 
 function loadJSON(key, fallback) {
   try {
@@ -250,40 +250,102 @@ function renderHome(){
 }
 
 function renderSetup(){
-  const cpus = CPU_ARCHETYPES.slice(0,7);
   app.innerHTML = shell(`<div class="section-title"><div><h1>League Setup</h1><p>Eight teams. Six rounds. One champion.</p></div></div>
   <div class="setup-grid">
     <section class="panel">
       <div class="field"><label>Your Team Name</label><input id="teamName" maxlength="24" value="${escapeHTML(savedSettings.teamName)}"></div>
-      <div class="field"><label>Draft Position</label><select id="draftSlot">${Array.from({length:8},(_,i)=>`<option value="${i+1}" ${savedSettings.draftSlot===i+1?'selected':''}>${i+1} — ${ordinal(i+1)} overall</option>`).join('')}</select></div>
-      <p class="muted small">The draft snakes each round. If you pick 1st in Round 1, you pick 8th in Round 2.</p>
-      <button class="btn primary" id="beginDraftBtn">Enter Draft Room</button>
+      <div class="draft-lottery-teaser">
+        <div class="draft-lottery-teaser-ball" aria-hidden="true"></div>
+        <div><strong>Draft position is randomized</strong><p>Your starting slot will be drawn from picks 1 through 8. The draft snakes each round, so every position creates a different board.</p></div>
+      </div>
+      <button class="btn primary lottery-start-btn" id="beginDraftBtn">Draw Draft Position</button>
     </section>
-    <aside class="panel"><h3>CPU GMs</h3><div class="cpu-list">${cpus.map((c,i)=>`<div class="cpu-row"><strong>${CPU_NAMES[i]}</strong><span>${c.name}</span></div>`).join('')}</div></aside>
+    <aside class="panel"><h3>League Format</h3><div class="cpu-list">
+      <div class="cpu-row"><strong>8 Teams</strong><span>7 CPU opponents</span></div>
+      <div class="cpu-row"><strong>6 Rounds</strong><span>Snake draft</span></div>
+      <div class="cpu-row"><strong>14 Games</strong><span>Everyone twice</span></div>
+      <div class="cpu-row"><strong>Top 4</strong><span>Make playoffs</span></div>
+      <div class="cpu-row"><strong>Draft Slot</strong><span>Random draw</span></div>
+    </div></aside>
   </div>`, `<button class="btn ghost" id="backBtn">Back</button>`);
   document.getElementById('backBtn').onclick=()=>{state.screen='home';render();};
   document.getElementById('beginDraftBtn').onclick=()=>{
     const name=(document.getElementById('teamName').value||'Kanto Kings').trim().slice(0,24);
-    const draftSlot=Number(document.getElementById('draftSlot').value);
-    savedSettings.teamName=name; savedSettings.draftSlot=draftSlot; saveJSON(SETTINGS_KEY,savedSettings);
-    startLeague(name,draftSlot);
+    savedSettings.teamName=name; saveJSON(SETTINGS_KEY,savedSettings);
+    showDraftLottery(name);
   };
 }
 
-function startLeague(teamName,draftSlot){
-  const cpuNamePool = shuffle(CPU_NAMES).slice(0,7);
-  const archetypes = shuffle(CPU_ARCHETYPES);
-  const teams=[];
-  let cpuIndex=0;
-  for(let slot=1;slot<=TEAM_COUNT;slot++){
-    if(slot===draftSlot){
-      teams.push({ id:'user', name:teamName, slot, user:true, archetype:{key:'user',name:'You'}, roster:[] });
-    } else {
-      teams.push({ id:`cpu${cpuIndex+1}`, name:cpuNamePool[cpuIndex], slot, user:false, archetype:archetypes[cpuIndex], roster:[] });
-      cpuIndex++;
-    }
-  }
-  state.league={ teams, userId:'user' };
+function createDraftLottery(teamName){
+  const cpuNamePool=shuffle(CPU_NAMES).slice(0,7);
+  const archetypes=shuffle(CPU_ARCHETYPES);
+  const entrants=[{id:'user',name:teamName,user:true,archetype:{key:'user',name:'You'},roster:[]}];
+  cpuNamePool.forEach((name,i)=>entrants.push({id:`cpu${i+1}`,name,user:false,archetype:archetypes[i],roster:[]}));
+  const teams=shuffle(entrants).map((team,i)=>({...team,slot:i+1}));
+  return {teams,userSlot:teams.find(t=>t.user).slot};
+}
+
+function showDraftLottery(teamName){
+  const previous=document.querySelector('.lottery-backdrop');
+  if(previous) previous.remove();
+  const lottery=createDraftLottery(teamName);
+  const wrap=document.createElement('div');
+  wrap.className='modal-backdrop lottery-backdrop';
+  wrap.setAttribute('role','dialog');
+  wrap.setAttribute('aria-modal','true');
+  wrap.setAttribute('aria-labelledby','lotteryTitle');
+  wrap.innerHTML=`<div class="modal lottery-modal">
+    <div class="lottery-heading">
+      <div class="eyebrow">Draft Lottery</div>
+      <h2 id="lotteryTitle">Determining your draft position...</h2>
+      <p id="lotteryStatus">Eight teams are going into the draw.</p>
+    </div>
+    <div class="lottery-machine is-spinning" id="lotteryMachine" aria-hidden="true">
+      <div class="lottery-ball lottery-ball-1"><span>?</span></div>
+      <div class="lottery-ball lottery-ball-2"><span>?</span></div>
+      <div class="lottery-ball lottery-ball-3"><span>?</span></div>
+      <div class="lottery-ball lottery-ball-4"><span>?</span></div>
+      <div class="lottery-ball lottery-ball-5"><span>?</span></div>
+      <div class="lottery-ball lottery-ball-6"><span>?</span></div>
+      <div class="lottery-ball lottery-ball-7"><span>?</span></div>
+      <div class="lottery-ball lottery-ball-8"><span>?</span></div>
+      <div class="lottery-draw-window"><small>YOUR PICK</small><strong id="lotteryPick">?</strong></div>
+    </div>
+    <div class="lottery-reveal" id="lotteryReveal" hidden>
+      <div class="lottery-result-callout"><span>You will draft</span><strong>${ordinal(lottery.userSlot)}</strong><small>${lottery.userSlot===1?'First pick in Round 1 • last pick in Round 2':lottery.userSlot===8?'Last pick in Round 1 • first pick in Round 2':`Pick ${lottery.userSlot} in Round 1`}</small></div>
+      <div class="lottery-order-wrap">
+        <div class="lottery-order-title"><h3>Official Draft Order</h3><span>Round 1</span></div>
+        <div class="lottery-order">${lottery.teams.map((team,i)=>`<div class="lottery-order-row ${team.user?'you':''}" style="--reveal-delay:${i*45}ms"><b>${i+1}</b><span>${escapeHTML(team.name)}</span>${team.user?'<em>YOU</em>':''}</div>`).join('')}</div>
+      </div>
+      <p class="lottery-snake-note">Round 2 reverses this order, then the draft continues in snake format.</p>
+      <button class="btn primary lottery-enter-btn" id="enterDraftAfterLottery">Enter Draft Room</button>
+    </div>
+  </div>`;
+  document.body.appendChild(wrap);
+  const reduceMotion=window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const reveal=()=>{
+    const machine=document.getElementById('lotteryMachine');
+    if(!machine || !document.body.contains(wrap)) return;
+    machine.classList.remove('is-spinning');
+    machine.classList.add('is-revealed');
+    document.getElementById('lotteryPick').textContent=lottery.userSlot;
+    document.getElementById('lotteryTitle').textContent=`You drew the ${ordinal(lottery.userSlot)} pick!`;
+    document.getElementById('lotteryStatus').textContent='The full Round 1 order is locked in.';
+    const revealPanel=document.getElementById('lotteryReveal');
+    revealPanel.hidden=false;
+    requestAnimationFrame(()=>revealPanel.classList.add('show'));
+    const enter=document.getElementById('enterDraftAfterLottery');
+    enter.onclick=()=>{
+      wrap.remove();
+      startLeagueWithTeams(lottery.teams);
+    };
+    enter.focus({preventScroll:true});
+  };
+  window.setTimeout(reveal, reduceMotion?250:1900);
+}
+
+function startLeagueWithTeams(teams){
+  state.league={ teams:teams.map(team=>({...team,roster:[]})), userId:'user' };
   state.draft={ pickIndex:0, available:state.pokemon.map(p=>p.id), log:[], search:'', sort:'projection', status:'active' };
   state.season=null;
   state.screen='draft';
