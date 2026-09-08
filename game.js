@@ -406,7 +406,14 @@ function pokemonCardHTML(p,canDraft){
   return `<article class="poke-card"><button ${canDraft?'':'disabled'} data-draft-id="${p.id}">
     <div class="poke-top"><span class="rank-pill">#${p.projRank}</span><img src="${p.sprite}" onerror="this.src='${spriteFallback(p.id)}'" alt="${p.name}"></div>
     <div class="poke-info"><div class="poke-name"><strong>${p.name}</strong></div><div class="types">${p.types.map(t=>`<span class="type">${t}</span>`).join('')}</div>
-    <div class="mini-stats"><div><b>${p.spe}</b><span>SPD</span></div><div><b>${Math.max(p.atk,p.spa)}</b><span>OFF</span></div><div><b>${Math.round(p.bulk)}</b><span>BULK</span></div></div></div>
+    <div class="mini-stats full-base-stats">
+      <div><b>${p.hp}</b><span>HP</span></div>
+      <div><b>${p.atk}</b><span>ATK</span></div>
+      <div><b>${p.def}</b><span>DEF</span></div>
+      <div><b>${p.spa}</b><span>SP ATK</span></div>
+      <div><b>${p.spd}</b><span>SP DEF</span></div>
+      <div><b>${p.spe}</b><span>SPEED</span></div>
+    </div></div>
   </button></article>`;
 }
 function rosterHTML(ids){
@@ -508,7 +515,30 @@ function calculateCoverage(roster){
   return clamp(45+(covered/targetTypes.length)*55,0,100);
 }
 function typeDefenseMultiplier(attType,pokemon){
+  // Multiply across every defending type so dual typings behave like the real games:
+  // 2× + 2× = 4×, 0.5× + 0.5× = 0.25×, and any immunity makes the attack 0×.
   return pokemon.types.reduce((m,defType)=>m*(TYPE_CHART[attType]?.[defType] ?? 1),1);
+}
+function bestTypeMultiplier(attacker,defender){
+  // There is no moveset system in Draft League, so each Pokémon is assumed to be
+  // able to use an attack matching either of its own types. Use its best STAB matchup.
+  return Math.max(...attacker.types.map(attType=>typeDefenseMultiplier(attType,defender)));
+}
+function typeMultiplierStage(multiplier){
+  // Convert effectiveness to evenly spaced matchup steps.
+  // 0.25×=-2, 0.5×=-1, 1×=0, 2×=+1, 4×=+2. Immunity is intentionally worse.
+  if(multiplier===0) return -3;
+  return Math.log2(multiplier);
+}
+function typeMatchupData(a,b){
+  const aMultiplier=bestTypeMultiplier(a,b);
+  const bMultiplier=bestTypeMultiplier(b,a);
+  return {
+    aMultiplier,
+    bMultiplier,
+    aStage:typeMultiplierStage(aMultiplier),
+    bStage:typeMultiplierStage(bMultiplier)
+  };
 }
 function calculateWeaknessManagement(roster){
   let danger=0;
@@ -588,9 +618,11 @@ function createSeason(){
 
 function duelExpectedEdge(a,b){
   const speedEdge=(a.spe-b.spe)*.12;
-  const aBest=Math.max(...a.types.map(at=>Math.max(...b.types.map(bt=>TYPE_CHART[at]?.[bt] ?? 1))));
-  const bBest=Math.max(...b.types.map(at=>Math.max(...a.types.map(bt=>TYPE_CHART[at]?.[bt] ?? 1))));
-  const matchupEdge=(aBest-bBest)*32;
+  const type=typeMatchupData(a,b);
+  // One effectiveness step (1× -> 2×, or 1× -> 0.5×) is meaningful without
+  // automatically overriding every stat advantage. 4× weaknesses and immunities
+  // naturally create much larger swings because the stages stack.
+  const matchupEdge=(type.aStage-type.bStage)*14;
   const powerEdge=(a.projectionScore-b.projectionScore)*.28;
   return powerEdge+speedEdge+matchupEdge;
 }
@@ -684,7 +716,9 @@ function nextUserGame(){
 
 function typePressure(teamA,teamB){
   const a=teamA.roster.map(pokemonById), b=teamB.roster.map(pokemonById);
-  return avg(a.map(p=>avg(b.map(o=>Math.max(...p.types.map(t=>Math.max(...o.types.map(ot=>TYPE_CHART[t]?.[ot] ?? 1))))))));
+  // Average matchup stage across the full opposing roster, using exact dual-type
+  // effectiveness. This powers the preview and CPU lineup decisions consistently.
+  return avg(a.map(p=>avg(b.map(o=>typeMultiplierStage(bestTypeMultiplier(p,o))))));
 }
 
 function matchupPreview(teamA,teamB){
@@ -1237,8 +1271,34 @@ async function init(){
     state.screen='home';
     render();
     if('serviceWorker' in navigator){
-      navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'})
-        .then(reg=>reg.update())
+      let refreshing=false;
+      navigator.serviceWorker.addEventListener('controllerchange',()=>{
+        if(refreshing) return;
+        refreshing=true;
+        // As soon as the newest worker takes control, reload once so nobody stays
+        // on an old HTML/CSS/JS bundle after an update.
+        window.location.reload();
+      });
+
+      navigator.serviceWorker.register('./sw.js?v=1.8.0',{updateViaCache:'none'})
+        .then(reg=>{
+          const activateNow=worker=>{
+            if(worker) worker.postMessage({type:'SKIP_WAITING'});
+          };
+          activateNow(reg.waiting);
+          reg.addEventListener('updatefound',()=>{
+            const worker=reg.installing;
+            if(!worker) return;
+            worker.addEventListener('statechange',()=>{
+              if(worker.state==='installed' && navigator.serviceWorker.controller){
+                activateNow(worker);
+              }
+            });
+          });
+          // Explicitly check every time the app starts. updateViaCache:none makes
+          // the worker script bypass the HTTP cache for update checks.
+          return reg.update();
+        })
         .catch(()=>{});
     }
   }catch(err){

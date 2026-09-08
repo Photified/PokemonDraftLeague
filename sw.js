@@ -1,5 +1,5 @@
-const CACHE = 'pokemon-draft-v1.7.0';
-const CORE = ['./', './index.html', './style.css?v=1.7.0', './game.js?v=1.7.0', './manifest.json?v=1.7.0', './icon.svg'];
+const CACHE = 'pokemon-draft-v1.8.0';
+const CORE = ['./', './index.html', './style.css?v=1.8.0', './game.js?v=1.8.0', './manifest.json?v=1.8.0', './icon.svg'];
 
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(CORE)));
@@ -13,6 +13,10 @@ self.addEventListener('activate', event => {
   self.clients.claim();
 });
 
+self.addEventListener('message', event => {
+  if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting();
+});
+
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
 
@@ -24,7 +28,7 @@ self.addEventListener('fetch', event => {
 
   if (isAppShell) {
     event.respondWith(
-      fetch(event.request)
+      fetch(event.request, { cache: 'no-store' })
         .then(response => {
           if (response && response.ok) {
             const copy = response.clone();
