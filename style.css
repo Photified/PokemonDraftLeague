@@ -1158,3 +1158,128 @@ button.bracket-match:hover { border-color: #65738a; transform: translateY(-1px);
   .lottery-order-row { opacity:1; transform:none; }
   .lottery-reveal { transition:none; }
 }
+
+/* v1.12: Settings / How to Play + install app */
+.settings-cog {
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel-2);
+  color: var(--text);
+  font-size: 1.15rem;
+  line-height: 1;
+}
+.settings-cog:hover { filter: brightness(1.1); }
+.settings-cog:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.settings-backdrop { z-index: 50; background: rgba(3,5,8,.86); }
+.settings-modal {
+  width: min(720px,100%);
+  max-height: min(90vh,880px);
+  padding: 0;
+  overflow: auto;
+  background: linear-gradient(180deg,#1b2230,#151a23);
+  border-color: #3b4658;
+}
+.settings-modal-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px 15px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(24,30,41,.97);
+  backdrop-filter: blur(10px);
+}
+.settings-modal-head h2 { margin: 3px 0 0; letter-spacing: -.035em; }
+.settings-close {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #11161f;
+  color: var(--text);
+  font-size: 1.55rem;
+  line-height: 1;
+}
+.settings-close:hover { filter: brightness(1.12); }
+.settings-close:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.settings-modal-body { padding: 18px 20px 8px; }
+.settings-intro {
+  padding: 16px;
+  border: 1px solid rgba(255,213,74,.25);
+  border-radius: 15px;
+  background: linear-gradient(135deg,rgba(255,213,74,.09),rgba(17,22,31,.72));
+}
+.settings-kicker { color: var(--accent); font-size: .67rem; font-weight: 950; letter-spacing: .14em; }
+.settings-intro p { margin: 7px 0 0; color: var(--muted); line-height: 1.5; font-size: .86rem; }
+.how-to-play-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-top: 12px; }
+.how-step {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 34px minmax(0,1fr);
+  gap: 10px;
+  align-items: start;
+  padding: 13px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #11161f;
+}
+.how-step > span {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  background: var(--accent);
+  color: #171717;
+  font-weight: 950;
+  font-size: .78rem;
+}
+.how-step strong { display: block; margin: 1px 0 4px; font-size: .82rem; }
+.how-step p { margin: 0; color: var(--muted); font-size: .72rem; line-height: 1.45; }
+.settings-tip {
+  display: grid;
+  grid-template-columns: auto minmax(0,1fr);
+  gap: 9px;
+  align-items: start;
+  margin-top: 12px;
+  padding: 11px 13px;
+  border: 1px solid #334056;
+  border-radius: 12px;
+  background: #131923;
+  color: var(--muted);
+  font-size: .74rem;
+  line-height: 1.45;
+}
+.settings-tip strong { color: var(--accent); }
+.settings-install {
+  position: sticky;
+  bottom: 0;
+  padding: 15px 20px 18px;
+  border-top: 1px solid var(--line);
+  background: rgba(21,26,35,.98);
+  backdrop-filter: blur(10px);
+}
+.install-app-btn { width: 100%; min-height: 48px; letter-spacing: .04em; }
+.settings-install p { margin: 8px 4px 0; color: var(--muted); text-align: center; font-size: .7rem; line-height: 1.4; }
+
+@media (max-width: 640px) {
+  .top-actions { flex-wrap: nowrap; align-items: center; }
+  .settings-cog { width: 39px; height: 39px; flex-basis: 39px; border-radius: 11px; font-size: 1.05rem; }
+  .settings-modal { max-height: 92vh; border-radius: 18px; }
+  .settings-modal-head { padding: 15px 15px 13px; }
+  .settings-modal-body { padding: 14px 15px 6px; }
+  .how-to-play-grid { grid-template-columns: 1fr; gap: 7px; }
+  .how-step { padding: 11px; }
+  .settings-install { padding: 13px 15px 15px; }
+}

@@ -23,6 +23,23 @@ const CHALLENGES = [
 
 const app = document.getElementById('app');
 
+let deferredInstallPrompt = null;
+let appInstallStatus = '';
+
+window.addEventListener('beforeinstallprompt', event => {
+  event.preventDefault();
+  deferredInstallPrompt = event;
+  appInstallStatus = '';
+  syncInstallButton();
+});
+
+window.addEventListener('appinstalled', () => {
+  deferredInstallPrompt = null;
+  appInstallStatus = 'Pokémon Draft League is installed.';
+  syncInstallButton();
+  toast('App installed');
+});
+
 const TYPE_CHART = {
   normal:   { rock:.5, ghost:0, steel:.5 },
   fire:     { fire:.5, water:.5, grass:2, ice:2, bug:2, rock:.5, dragon:.5, steel:2 },
@@ -183,7 +200,7 @@ function shell(content, actions=''){
   return `<main class="shell">
     <header class="topbar">
       <div class="brand"><span class="brand-ball"></span><span>Pokémon Draft League</span></div>
-      <div class="top-actions">${actions}</div>
+      <div class="top-actions">${actions}<button class="settings-cog" id="settingsButton" type="button" aria-label="Settings and how to play" title="Settings">⚙️</button></div>
     </header>
     ${content}
   </main>`;
@@ -1365,6 +1382,102 @@ function bindPokemonDetailTriggers(){
   });
 }
 
+function isStandaloneApp(){
+  return window.matchMedia?.('(display-mode: standalone)').matches || window.navigator.standalone === true;
+}
+
+function isIOSDevice(){
+  return /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
+function settingsInstructionsHTML(){
+  return `<div class="settings-intro">
+    <span class="settings-kicker">GEN 1 DRAFT LEAGUE</span>
+    <p>Draft six Pokémon, manage your weekly battle order, survive the playoffs and build a permanent championship history.</p>
+  </div>
+  <div class="how-to-play-grid">
+    <article class="how-step"><span>1</span><div><strong>Draw Your Draft Slot</strong><p>Every league begins with a random 1–8 draft position. The draft snakes for six rounds, so everyone finishes with six Pokémon.</p></div></article>
+    <article class="how-step"><span>2</span><div><strong>Build Your Team</strong><p>Use base stats, typing, speed and roster balance to decide who to draft. Every Pokémon can only be selected once.</p></div></article>
+    <article class="how-step"><span>3</span><div><strong>Set Your Battle Order</strong><p>Before each game, arrange your six Pokémon from 1–6. Each slot battles the Pokémon in the same hidden CPU slot.</p></div></article>
+    <article class="how-step"><span>4</span><div><strong>Win Matchups</strong><p>Battle results use all six base stats, real dual-type effectiveness, speed and controlled randomness. Smart type matchups can overcome stronger Pokémon.</p></div></article>
+    <article class="how-step"><span>5</span><div><strong>Reach the Playoffs</strong><p>Play a 14-game regular season. The top four teams advance to the semifinals, then the winners meet for the championship.</p></div></article>
+    <article class="how-step"><span>6</span><div><strong>Build Your Legacy</strong><p>Earn trainer badges, track career stats and revisit every championship roster in the Hall of Champions.</p></div></article>
+  </div>
+  <div class="settings-tip"><strong>Tip</strong><span>Tap your Pokémon during the season or matchup screen to see its full base stats and season record.</span></div>`;
+}
+
+function installHelpText(){
+  if(isStandaloneApp()) return 'This app is already installed on this device.';
+  if(appInstallStatus) return appInstallStatus;
+  if(deferredInstallPrompt) return 'Install it for a full-screen app experience and quick access from your home screen.';
+  if(isIOSDevice()) return 'On iPhone or iPad, tap Share in Safari, then choose Add to Home Screen.';
+  return 'If your browser does not show an install prompt, open its menu and choose Install app or Add to Home screen.';
+}
+
+function syncInstallButton(){
+  const btn=document.getElementById('installAppButton');
+  const help=document.getElementById('installHelp');
+  if(!btn) return;
+  const installed=isStandaloneApp();
+  btn.disabled=installed;
+  btn.textContent=installed?'APP INSTALLED':'INSTALL APP';
+  if(help) help.textContent=installHelpText();
+}
+
+async function handleInstallApp(){
+  if(isStandaloneApp()){ syncInstallButton(); return; }
+  if(deferredInstallPrompt){
+    const prompt=deferredInstallPrompt;
+    deferredInstallPrompt=null;
+    try{
+      await prompt.prompt();
+      const choice=await prompt.userChoice;
+      appInstallStatus=choice?.outcome==='accepted'?'Install accepted. The app will appear on your device shortly.':'Install cancelled. You can try again from this menu.';
+    }catch{
+      appInstallStatus='Your browser could not open the install prompt. Try its menu and choose Install app.';
+    }
+    syncInstallButton();
+    return;
+  }
+  appInstallStatus=isIOSDevice()
+    ? 'On iPhone or iPad: tap Share in Safari, then tap Add to Home Screen.'
+    : 'Open your browser menu and choose Install app or Add to Home screen.';
+  syncInstallButton();
+}
+
+function openSettingsModal(){
+  const old=document.querySelector('.modal-backdrop');
+  if(old) old.remove();
+  state.modal=null;
+  const wrap=document.createElement('div');
+  wrap.className='modal-backdrop settings-backdrop';
+  wrap.setAttribute('role','dialog');
+  wrap.setAttribute('aria-modal','true');
+  wrap.setAttribute('aria-labelledby','settingsModalTitle');
+  wrap.innerHTML=`<div class="modal settings-modal">
+    <div class="settings-modal-head">
+      <div><span class="eyebrow">SETTINGS</span><h2 id="settingsModalTitle">How to Play</h2></div>
+      <button class="settings-close" id="closeSettings" type="button" aria-label="Close settings">×</button>
+    </div>
+    <div class="settings-modal-body">${settingsInstructionsHTML()}</div>
+    <div class="settings-install">
+      <button class="btn primary install-app-btn" id="installAppButton" type="button">INSTALL APP</button>
+      <p id="installHelp"></p>
+    </div>
+  </div>`;
+  document.body.appendChild(wrap);
+  const close=()=>{
+    document.removeEventListener('keydown',onKey);
+    wrap.remove();
+  };
+  const onKey=e=>{ if(e.key==='Escape') close(); };
+  document.addEventListener('keydown',onKey);
+  document.getElementById('closeSettings').onclick=close;
+  document.getElementById('installAppButton').onclick=handleInstallApp;
+  wrap.onclick=e=>{ if(e.target===wrap) close(); };
+  syncInstallButton();
+}
+
 function showCareerModal(){
   const topDrafted=Object.entries(career.pokemonDraftCounts).sort((a,b)=>b[1]-a[1]).slice(0,5);
   const topWinners=Object.entries(career.pokemonSeasonWins).sort((a,b)=>b[1]-a[1]).slice(0,5);
@@ -1388,6 +1501,14 @@ function toast(msg){
 }
 function escapeHTML(str){ return String(str).replace(/[&<>'"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':'&quot;'}[c])); }
 
+document.addEventListener('click', event => {
+  const settingsButton=event.target.closest?.('#settingsButton');
+  if(settingsButton){
+    event.preventDefault();
+    openSettingsModal();
+  }
+});
+
 async function init(){
   try{
     renderLoading();
@@ -1404,7 +1525,7 @@ async function init(){
         window.location.reload();
       });
 
-      navigator.serviceWorker.register('./sw.js?v=1.10.0',{updateViaCache:'none'})
+      navigator.serviceWorker.register('./sw.js?v=1.12.0',{updateViaCache:'none'})
         .then(reg=>{
           const activateNow=worker=>{
             if(worker) worker.postMessage({type:'SKIP_WAITING'});
