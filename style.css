@@ -992,8 +992,27 @@ button.bracket-match:hover { border-color: #65738a; transform: translateY(-1px);
   transform:translate(-50%,-50%);
 }
 .lottery-start-btn { width:100%; }
-.lottery-backdrop { z-index: 30; background: rgba(3,5,8,.88); }
-.lottery-modal { width:min(700px,100%); overflow:hidden; max-height:min(92vh,860px); }
+.lottery-backdrop {
+  z-index: 30;
+  background: rgba(3,5,8,.88);
+  /* In-app browsers (Messenger/Instagram/etc.) often expose a shorter visual
+     viewport than Chrome/Safari. Let the overlay itself scroll as a fallback. */
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+.lottery-modal {
+  width:min(700px,100%);
+  max-height:min(92vh,860px);
+  max-height:min(92dvh,860px);
+  overflow-x:hidden;
+  overflow-y:auto;
+  -webkit-overflow-scrolling:touch;
+  overscroll-behavior:contain;
+  touch-action:pan-y;
+  scrollbar-gutter:stable;
+}
 .lottery-heading { text-align:center; }
 .lottery-heading h2 { margin:7px 0 5px; font-size:clamp(1.45rem,4vw,2rem); letter-spacing:-.035em; }
 .lottery-heading p { margin:0; color:var(--muted); font-size:.84rem; }
@@ -1127,8 +1146,17 @@ button.bracket-match:hover { border-color: #65738a; transform: translateY(-1px);
 .lottery-enter-btn { width:100%; }
 
 @media (max-width:560px) {
-  .lottery-backdrop { padding:10px; }
-  .lottery-modal { padding:15px; max-height:94vh; border-radius:18px; }
+  .lottery-backdrop {
+    padding:10px;
+    place-items:start center;
+  }
+  .lottery-modal {
+    padding:15px;
+    /* Percentage height is based on the fixed overlay rather than browser chrome,
+       which is more reliable inside Messenger's embedded browser. */
+    max-height:calc(100% - 2px);
+    border-radius:18px;
+  }
   .lottery-machine { height:180px; margin:14px auto 12px; border-radius:21px; }
   .lottery-ball { width:44px; height:44px; border-width:3px; }
   .lottery-ball::after { width:13px; height:13px; border-width:3px; }
@@ -1142,12 +1170,31 @@ button.bracket-match:hover { border-color: #65738a; transform: translateY(-1px);
   .lottery-ball-7 { --dx:45px; --dy:-93px; }
   .lottery-ball-8 { --dx:-85px; --dy:82px; }
   .lottery-draw-window { bottom:9px; width:102px; min-height:52px; }
+  /* Put the continue action above the long order list on phones so even a
+     restrictive in-app browser can never trap the user in the lottery. */
+  .lottery-reveal { display:flex; flex-direction:column; }
+  .lottery-result-callout { order:1; }
+  .lottery-enter-btn { order:2; margin:0 0 12px; min-height:46px; flex:none; }
+  .lottery-order-wrap { order:3; }
+  .lottery-snake-note { order:4; }
   .lottery-order { grid-template-columns:1fr; }
   .lottery-order-row:nth-child(odd) { border-right:0; }
   .lottery-order-row { min-height:37px; padding:5px 8px; }
   .lottery-result-callout { margin-bottom:11px; }
   .lottery-result-callout > strong { font-size:2.75rem; }
   .lottery-snake-note { margin:8px 0 10px; }
+}
+
+/* Short embedded-browser viewports: keep the top reachable and the modal scrollable. */
+@media (max-height:700px) {
+  .lottery-backdrop {
+    place-items:start center;
+    padding-top:max(8px, env(safe-area-inset-top));
+    padding-bottom:max(8px, env(safe-area-inset-bottom));
+  }
+  .lottery-modal {
+    max-height:calc(100% - 2px);
+  }
 }
 
 @media (prefers-reduced-motion:reduce) {
@@ -1604,3 +1651,6 @@ body.lineup-dragging { user-select: none; -webkit-user-select: none; }
   .matchup-side.user-side { grid-template-columns: 18px minmax(0,1fr) 28px; }
   .lineup-drag-handle { width: 28px; height: 36px; font-size: .94rem; }
 }
+
+
+/* v1.15: lottery modal scrolling fix for Messenger and other in-app browsers */
